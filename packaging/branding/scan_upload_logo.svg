@@ -1,0 +1,43 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="scanBlue" x1="80" y1="64" x2="424" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="docFill" x1="192" y1="146" x2="324" y2="370" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EAF3FF"/>
+    </linearGradient>
+    <linearGradient id="uploadGreen" x1="258" y1="314" x2="258" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34D399"/>
+      <stop offset="1" stop-color="#10B981"/>
+    </linearGradient>
+    <filter id="softShadow" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0F172A" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <!-- Scan frame -->
+  <path d="M96 196V126C96 109.431 109.431 96 126 96H196" stroke="url(#scanBlue)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M316 96H386C402.569 96 416 109.431 416 126V196" stroke="url(#scanBlue)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M96 316V386C96 402.569 109.431 416 126 416H196" stroke="url(#scanBlue)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M316 416H386C402.569 416 416 402.569 416 386V316" stroke="url(#scanBlue)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Document -->
+  <g filter="url(#softShadow)">
+    <path d="M184 142C184 126.536 196.536 114 212 114H292L350 172V338C350 353.464 337.464 366 322 366H212C196.536 366 184 353.464 184 338V142Z" fill="url(#docFill)" stroke="#60A5FA" stroke-width="12"/>
+    <path d="M292 114V154C292 169.464 304.536 182 320 182H350" fill="#BFDBFE"/>
+    <path d="M292 114V154C292 169.464 304.536 182 320 182H350" stroke="#60A5FA" stroke-width="10" stroke-linejoin="round"/>
+
+    <rect x="218" y="206" width="98" height="16" rx="8" fill="#3B82F6"/>
+    <rect x="218" y="244" width="116" height="16" rx="8" fill="#3B82F6"/>
+    <rect x="218" y="282" width="82" height="16" rx="8" fill="#60A5FA"/>
+  </g>
+
+  <!-- Upload badge -->
+  <g filter="url(#softShadow)">
+    <circle cx="264" cy="356" r="76" fill="url(#uploadGreen)" stroke="white" stroke-width="14"/>
+    <path d="M264 404V326" stroke="white" stroke-width="24" stroke-linecap="round"/>
+    <path d="M224 350L264 310L304 350" stroke="white" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
