@@ -168,6 +168,8 @@ jobs:
 
       - name: Build Linux packages
         env:
+          CC: clang-10
+          CXX: clang++-10
           MAX_GLIBC_VERSION: "2.31"
         run: ./scripts/build-linux.sh
 

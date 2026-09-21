@@ -105,6 +105,7 @@ def main() -> None:
 
     # 只有正式 Tag Release 才显示安装包下载地址
     if is_release and release_url:
+        link_lines.append(f"\n")
         link_lines.append(
             f"[📦 下载 {ref_name} Release 安装包]({release_url})"
         )
