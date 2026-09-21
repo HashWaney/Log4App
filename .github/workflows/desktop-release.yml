@@ -219,3 +219,33 @@ jobs:
               --generate-notes \
               --title "Log4App $GITHUB_REF_NAME"
           fi
+
+  notify-dingtalk:
+    name: Notify DingTalk
+    if: always()
+    needs:
+      - build-windows
+      - build-macos
+      - build-linux
+      - release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out notification script
+        uses: actions/checkout@v6
+
+      - name: Send CI result to DingTalk
+        env:
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
+          WINDOWS_RESULT: ${{ needs.build-windows.result }}
+          MACOS_RESULT: ${{ needs.build-macos.result }}
+          LINUX_RESULT: ${{ needs.build-linux.result }}
+          RELEASE_RESULT: ${{ needs.release.result }}
+          IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 .github/scripts/notify_dingtalk.py
