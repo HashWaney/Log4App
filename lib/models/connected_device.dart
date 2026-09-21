@@ -3,7 +3,8 @@ class ConnectedDevice {
     required this.deviceId,
     required this.deviceName,
     required this.appVersion,
-    required this.androidVersion,
+    required this.platform,
+    required this.platformVersion,
     required this.lastSeen,
     this.lastUploadAt,
     this.lastUploadBytes = 0,
@@ -12,7 +13,8 @@ class ConnectedDevice {
   final String deviceId;
   final String deviceName;
   final String appVersion;
-  final String androidVersion;
+  final String platform;
+  final String platformVersion;
   final DateTime lastSeen;
   final DateTime? lastUploadAt;
   final int lastUploadBytes;
@@ -25,7 +27,8 @@ class ConnectedDevice {
   ConnectedDevice copyWith({
     String? deviceName,
     String? appVersion,
-    String? androidVersion,
+    String? platform,
+    String? platformVersion,
     DateTime? lastSeen,
     DateTime? lastUploadAt,
     int? lastUploadBytes,
@@ -34,7 +37,8 @@ class ConnectedDevice {
       deviceId: deviceId,
       deviceName: deviceName ?? this.deviceName,
       appVersion: appVersion ?? this.appVersion,
-      androidVersion: androidVersion ?? this.androidVersion,
+      platform: platform ?? this.platform,
+      platformVersion: platformVersion ?? this.platformVersion,
       lastSeen: lastSeen ?? this.lastSeen,
       lastUploadAt: lastUploadAt ?? this.lastUploadAt,
       lastUploadBytes: lastUploadBytes ?? this.lastUploadBytes,
@@ -45,7 +49,11 @@ class ConnectedDevice {
         'deviceId': deviceId,
         'deviceName': deviceName,
         'appVersion': appVersion,
-        'androidVersion': androidVersion,
+        'platform': platform,
+        'platformVersion': platformVersion,
+        // Kept during the V2 protocol transition for existing Android clients.
+        'androidVersion':
+            platform.toLowerCase() == 'android' ? platformVersion : '',
         'lastSeen': lastSeen.toIso8601String(),
         'lastUploadAt': lastUploadAt?.toIso8601String(),
         'lastUploadBytes': lastUploadBytes,

@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Android Log Center
-Comment=Collect Android device logs over the local network
-Exec=/usr/bin/android-log-center
-Icon=android-log-center
+Name=Log4App
+Comment=Collect app logs over the local network
+Exec=/usr/bin/log4app
+Icon=log4app
 Terminal=false
 Categories=Development;Utility;
 StartupNotify=true

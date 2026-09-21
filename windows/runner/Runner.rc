@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "Android Log Center" "\0"
+            VALUE "FileDescription", "Log4App" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "android_log_center" "\0"
+            VALUE "InternalName", "log4app" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "android_log_center.exe" "\0"
-            VALUE "ProductName", "Android Log Center" "\0"
+            VALUE "OriginalFilename", "log4app.exe" "\0"
+            VALUE "ProductName", "Log4App" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

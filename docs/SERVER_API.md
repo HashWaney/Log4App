@@ -1,4 +1,4 @@
-# Android Log Center V2.1 — Server API
+# Log4App V2.1 — Server API
 
 默认监听：`0.0.0.0:9090`
 
@@ -11,6 +11,7 @@
 ```json
 {
   "type": "android-log-center",
+  "serviceName": "Log4App",
   "version": 1,
   "scheme": "http",
   "host": "172.16.50.167",
@@ -19,9 +20,9 @@
 }
 ```
 
-Android 扫码后应校验：
+采集端 App 扫码后应校验：
 
-- `type == android-log-center`
+- `type == android-log-center`（V2.1 兼容标识）
 - `version == 1`
 - `scheme == http`
 - `host` 非空
@@ -40,6 +41,7 @@ Android 扫码后应校验：
 ```json
 {
   "success": true,
+  "serviceName": "Log4App",
   "serviceType": "android-log-center",
   "protocolVersion": 1,
   "serverVersion": "2.1.0",
@@ -56,7 +58,7 @@ Android 扫码后应校验：
 
 兼容 V2.0 的简单连通性接口。
 
-V2.1 Android 新客户端应优先使用 `/api/device/ping`，因为只有设备 Ping 才会在桌面端登记设备。
+V2.1 采集端 App 应优先使用 `/api/device/ping`，因为只有设备 Ping 才会在桌面端登记设备。
 
 ---
 
@@ -71,7 +73,8 @@ Content-Type：`application/json`
   "deviceId": "ROBOT_001",
   "deviceName": "N2N-001",
   "appVersion": "3.2.1",
-  "androidVersion": "14"
+  "platform": "Android",
+  "platformVersion": "14"
 }
 ```
 
@@ -83,6 +86,7 @@ Content-Type：`application/json`
 {
   "success": true,
   "message": "device connected",
+  "serviceName": "Log4App",
   "serviceType": "android-log-center",
   "protocolVersion": 1,
   "serverVersion": "2.1.0",
@@ -91,6 +95,8 @@ Content-Type：`application/json`
     "deviceId": "ROBOT_001",
     "deviceName": "N2N-001",
     "appVersion": "3.2.1",
+    "platform": "Android",
+    "platformVersion": "14",
     "androidVersion": "14",
     "lastSeen": "2026-09-20T16:30:00.000",
     "lastUploadAt": null,
@@ -114,8 +120,10 @@ Content-Type：`application/json`
 |---|---:|---|
 | `deviceId` | 是 | 稳定设备标识 |
 | `deviceName` | 否 | 设备显示名称 |
-| `appVersion` | 否 | Android App 版本 |
-| `androidVersion` | 否 | Android 系统版本 |
+| `appVersion` | 否 | 采集端 App 版本 |
+| `platform` | 否 | 平台名称，如 Android、iOS、Flutter |
+| `platformVersion` | 否 | 平台或系统版本 |
+| `androidVersion` | 否 | 旧 Android 客户端兼容字段；新接入请使用 `platformVersion` |
 | `file` | 是 | ZIP/日志文件 |
 
 最大上传大小默认为 500 MB。
@@ -134,7 +142,7 @@ Content-Type：`application/json`
 
 返回本次桌面程序运行期间登记的设备。
 
-设备连接状态目前保存在内存中，程序重启后重新通过 Android Ping 登记；日志文件本身持久化保存。
+设备连接状态目前保存在内存中，程序重启后重新通过设备 Ping 登记；日志文件本身持久化保存。
 
 ---
 
@@ -152,12 +160,12 @@ Content-Type：`application/json`
 curl http://127.0.0.1:9090/api/server/info
 ```
 
-### 模拟 Android Ping
+### 模拟设备 Ping
 
 ```bash
 curl -X POST \
   -H 'Content-Type: application/json' \
-  -d '{"deviceId":"TEST_001","deviceName":"Test Android","appVersion":"1.0.0","androidVersion":"14"}' \
+  -d '{"deviceId":"TEST_001","deviceName":"Test Device","appVersion":"1.0.0","platform":"Android","platformVersion":"14"}' \
   http://127.0.0.1:9090/api/device/ping
 ```
 
@@ -166,9 +174,10 @@ curl -X POST \
 ```bash
 curl -X POST \
   -F 'deviceId=TEST_001' \
-  -F 'deviceName=Test Android' \
+  -F 'deviceName=Test Device' \
   -F 'appVersion=1.0.0' \
-  -F 'androidVersion=14' \
+  -F 'platform=Android' \
+  -F 'platformVersion=14' \
   -F 'file=@./test.zip' \
   http://127.0.0.1:9090/api/log/upload
 ```

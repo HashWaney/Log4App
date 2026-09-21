@@ -83,6 +83,7 @@ class _HomePageState extends State<HomePage> {
 
     return jsonEncode({
       'type': LogServer.serviceType,
+      'serviceName': LogServer.serviceName,
       'version': LogServer.protocolVersion,
       'scheme': 'http',
       'host': address,
@@ -179,7 +180,7 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Android Log Center'),
+        title: const Text('Log4App'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -323,7 +324,7 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 10),
             _InfoLine(label: '服务器地址', value: _serverBaseUrl),
             const SizedBox(height: 10),
-            _InfoLine(label: 'Android 上传', value: _uploadUrl),
+            _InfoLine(label: 'App 上传', value: _uploadUrl),
             const SizedBox(height: 10),
             _InfoLine(label: '日志目录', value: _storage.rootDirectory.path),
             if (_addresses.length > 1) ...[
@@ -369,7 +370,7 @@ class _HomePageState extends State<HomePage> {
             Text('扫码连接', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
-              'Android 与电脑需处于可互访的同一局域网。电脑 IP 变化后二维码会自动刷新。',
+              '采集端 App 与电脑需处于可互访的同一局域网。电脑 IP 变化后二维码会自动刷新。',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -424,7 +425,7 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 12),
             const Text(
-              '扫码后 Android 应先调用 POST /api/device/ping；Ping 成功后这里会显示已连接设备。',
+              '扫码后采集端 App 应先调用 POST /api/device/ping；Ping 成功后这里会显示已连接设备。',
             ),
           ],
         ),
@@ -441,8 +442,7 @@ class _HomePageState extends State<HomePage> {
           children: [
             Row(
               children: [
-                Text('Android 设备',
-                    style: Theme.of(context).textTheme.titleLarge),
+                Text('已登记设备', style: Theme.of(context).textTheme.titleLarge),
                 const Spacer(),
                 Text('${_devices.length} 台已登记'),
               ],
@@ -452,7 +452,7 @@ class _HomePageState extends State<HomePage> {
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(
-                  child: Text('暂无设备。请使用 Android 扫描上方二维码。'),
+                  child: Text('暂无设备。请使用采集端 App 扫描上方二维码。'),
                 ),
               )
             else
@@ -468,7 +468,7 @@ class _HomePageState extends State<HomePage> {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(
-        Icons.phone_android,
+        Icons.smartphone,
         color: online ? Colors.green : null,
       ),
       title: Row(
@@ -482,7 +482,7 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.only(top: 6),
         child: Text(
           'ID: ${device.deviceId}  ·  App ${device.appVersion}  ·  '
-          'Android ${device.androidVersion}\n'
+          '${device.platform} ${device.platformVersion}\n'
           '最后通信：${_relativeTime(device.lastSeen)}'
           '${device.lastUploadAt == null ? '' : '  ·  最后上传：${_relativeTime(device.lastUploadAt!)} (${_formatBytes(device.lastUploadBytes)})'}',
         ),
@@ -520,7 +520,7 @@ class _HomePageState extends State<HomePage> {
             if (_logs.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 28),
-                child: Center(child: Text('还没有收到 Android 日志')),
+                child: Center(child: Text('还没有收到 App 日志')),
               )
             else
               ..._logs.map(

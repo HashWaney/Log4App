@@ -28,7 +28,7 @@ if (-not $VersionLine) {
 $Version = $VersionLine.Matches[0].Groups[1].Value
 $ReleaseDir = Join-Path $Root "build\windows\x64\runner\Release"
 $DistDir = Join-Path $Root "dist\windows"
-$ZipPath = Join-Path $DistDir "AndroidLogCenter-$Version-windows-x64-portable.zip"
+$ZipPath = Join-Path $DistDir "Log4App-$Version-windows-x64-portable.zip"
 
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 if (Test-Path $ZipPath) {
@@ -67,4 +67,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Windows installer:"
-Write-Host (Join-Path $DistDir "AndroidLogCenter-$Version-windows-x64-setup.exe")
+Write-Host (Join-Path $DistDir "Log4App-$Version-windows-x64-setup.exe")

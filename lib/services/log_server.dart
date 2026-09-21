@@ -19,7 +19,9 @@ class LogServer {
   })  : _storage = storage,
         _network = network;
 
+  // V2 protocol identifier retained so already-shipped scanner clients work.
   static const String serviceType = 'android-log-center';
+  static const String serviceName = 'Log4App';
   static const int protocolVersion = 1;
   static const String serverVersion = '2.1.0';
 
@@ -97,7 +99,8 @@ class LogServer {
       if (request.method == 'GET' && request.uri.path == '/api/log/ping') {
         await _json(request.response, HttpStatus.ok, {
           'success': true,
-          'message': 'Android Log Center online',
+          'message': '$serviceName online',
+          'serviceName': serviceName,
           'serviceType': serviceType,
           'protocolVersion': protocolVersion,
           'serverVersion': serverVersion,
@@ -159,6 +162,7 @@ class LogServer {
     final addresses = await _network.getLanIpv4Addresses();
     await _json(request.response, HttpStatus.ok, {
       'success': true,
+      'serviceName': serviceName,
       'serviceType': serviceType,
       'protocolVersion': protocolVersion,
       'serverVersion': serverVersion,
@@ -212,17 +216,25 @@ class LogServer {
       return;
     }
 
+    final legacyAndroidVersion = _stringValue(payload['androidVersion']);
+    final platform = _stringValue(payload['platform']);
+    final platformVersion = _stringValue(payload['platformVersion']);
     final device = _touchDevice(
       deviceId: deviceId,
       deviceName: _stringValue(payload['deviceName']),
       appVersion: _stringValue(payload['appVersion']),
-      androidVersion: _stringValue(payload['androidVersion']),
+      platform: platform.isEmpty
+          ? (legacyAndroidVersion.isEmpty ? 'unknown' : 'Android')
+          : platform,
+      platformVersion:
+          platformVersion.isEmpty ? legacyAndroidVersion : platformVersion,
     );
 
     lastError = null;
     await _json(request.response, HttpStatus.ok, {
       'success': true,
       'message': 'device connected',
+      'serviceName': serviceName,
       'serviceType': serviceType,
       'protocolVersion': protocolVersion,
       'serverVersion': serverVersion,
@@ -257,7 +269,9 @@ class LogServer {
     String deviceId = '';
     String deviceName = '';
     String appVersion = '';
-    String androidVersion = '';
+    String platform = '';
+    String platformVersion = '';
+    String legacyAndroidVersion = '';
     String originalFileName = 'logs.zip';
     File? tempFile;
     int fileBytes = 0;
@@ -274,7 +288,7 @@ class LogServer {
         originalFileName = fileName ?? originalFileName;
         tempFile ??= File(
           '${Directory.systemTemp.path}${Platform.pathSeparator}'
-          'android_log_${DateTime.now().microsecondsSinceEpoch}.upload',
+          'log4app_${DateTime.now().microsecondsSinceEpoch}.upload',
         );
         final sink = tempFile.openWrite();
         await for (final List<int> chunk in part) {
@@ -296,7 +310,11 @@ class LogServer {
         if (fieldName == 'deviceId') deviceId = value.trim();
         if (fieldName == 'deviceName') deviceName = value.trim();
         if (fieldName == 'appVersion') appVersion = value.trim();
-        if (fieldName == 'androidVersion') androidVersion = value.trim();
+        if (fieldName == 'platform') platform = value.trim();
+        if (fieldName == 'platformVersion') platformVersion = value.trim();
+        if (fieldName == 'androidVersion') {
+          legacyAndroidVersion = value.trim();
+        }
       }
     }
 
@@ -327,7 +345,11 @@ class LogServer {
     _recordUpload(
       entry,
       deviceName: deviceName,
-      androidVersion: androidVersion,
+      platform: platform.isEmpty
+          ? (legacyAndroidVersion.isEmpty ? 'unknown' : 'Android')
+          : platform,
+      platformVersion:
+          platformVersion.isEmpty ? legacyAndroidVersion : platformVersion,
     );
 
     await _json(request.response, HttpStatus.ok, {
@@ -348,11 +370,15 @@ class LogServer {
 
     final deviceName = request.headers.value('x-device-name') ?? '';
     final appVersion = request.headers.value('x-app-version') ?? 'unknown';
-    final androidVersion = request.headers.value('x-android-version') ?? '';
+    final legacyAndroidVersion =
+        request.headers.value('x-android-version') ?? '';
+    final platform = request.headers.value('x-platform') ?? '';
+    final platformVersion =
+        request.headers.value('x-platform-version') ?? legacyAndroidVersion;
     final fileName = request.headers.value('x-file-name') ?? 'logs.zip';
     final tempFile = File(
       '${Directory.systemTemp.path}${Platform.pathSeparator}'
-      'android_log_${DateTime.now().microsecondsSinceEpoch}.upload',
+      'log4app_${DateTime.now().microsecondsSinceEpoch}.upload',
     );
     final sink = tempFile.openWrite();
     var size = 0;
@@ -382,7 +408,10 @@ class LogServer {
     _recordUpload(
       entry,
       deviceName: deviceName,
-      androidVersion: androidVersion,
+      platform: platform.isEmpty
+          ? (legacyAndroidVersion.isEmpty ? 'unknown' : 'Android')
+          : platform,
+      platformVersion: platformVersion,
     );
 
     await _json(request.response, HttpStatus.ok, {
@@ -395,7 +424,8 @@ class LogServer {
     required String deviceId,
     String deviceName = '',
     String appVersion = '',
-    String androidVersion = '',
+    String platform = '',
+    String platformVersion = '',
     DateTime? lastUploadAt,
     int? lastUploadBytes,
   }) {
@@ -407,7 +437,9 @@ class LogServer {
             deviceId: deviceId,
             deviceName: deviceName.isEmpty ? deviceId : deviceName,
             appVersion: appVersion.isEmpty ? 'unknown' : appVersion,
-            androidVersion: androidVersion.isEmpty ? 'unknown' : androidVersion,
+            platform: platform.isEmpty ? 'unknown' : platform,
+            platformVersion:
+                platformVersion.isEmpty ? 'unknown' : platformVersion,
             lastSeen: now,
             lastUploadAt: lastUploadAt,
             lastUploadBytes: lastUploadBytes ?? 0,
@@ -415,9 +447,10 @@ class LogServer {
         : existing.copyWith(
             deviceName: deviceName.isEmpty ? existing.deviceName : deviceName,
             appVersion: appVersion.isEmpty ? existing.appVersion : appVersion,
-            androidVersion: androidVersion.isEmpty
-                ? existing.androidVersion
-                : androidVersion,
+            platform: platform.isEmpty ? existing.platform : platform,
+            platformVersion: platformVersion.isEmpty
+                ? existing.platformVersion
+                : platformVersion,
             lastSeen: now,
             lastUploadAt: lastUploadAt,
             lastUploadBytes: lastUploadBytes,
@@ -430,7 +463,8 @@ class LogServer {
   void _recordUpload(
     LogEntry entry, {
     String deviceName = '',
-    String androidVersion = '',
+    String platform = '',
+    String platformVersion = '',
   }) {
     totalUploads += 1;
     totalBytes += entry.sizeBytes;
@@ -441,7 +475,8 @@ class LogServer {
       deviceId: entry.deviceId,
       deviceName: deviceName,
       appVersion: entry.appVersion,
-      androidVersion: androidVersion,
+      platform: platform,
+      platformVersion: platformVersion,
       lastUploadAt: entry.uploadedAt,
       lastUploadBytes: entry.sizeBytes,
     );
@@ -466,7 +501,7 @@ class LogServer {
     response.headers.set(
       'Access-Control-Allow-Headers',
       'Content-Type, X-Device-Id, X-Device-Name, X-App-Version, '
-          'X-Android-Version, X-File-Name',
+          'X-Platform, X-Platform-Version, X-Android-Version, X-File-Name',
     );
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   }

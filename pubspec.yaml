@@ -1,5 +1,5 @@
-name: android_log_center
-description: Cross-platform LAN log collector for Android devices.
+name: log4app
+description: Cross-platform LAN log collector for apps and devices.
 publish_to: 'none'
 version: 2.1.0+2
 

@@ -41,14 +41,14 @@ flutter pub get
 flutter build linux --release
 
 BUNDLE_DIR="$ROOT/build/linux/$FLUTTER_ARCH/release/bundle"
-if [ ! -x "$BUNDLE_DIR/android_log_center" ]; then
+if [ ! -x "$BUNDLE_DIR/log4app" ]; then
   echo "Linux release bundle is missing: $BUNDLE_DIR" >&2
   exit 1
 fi
 
 DIST_DIR="$ROOT/dist/linux"
 PACKAGE_ROOT="$ROOT/build/linux/package-root"
-APP_DIR="$PACKAGE_ROOT/opt/android-log-center"
+APP_DIR="$PACKAGE_ROOT/opt/log4app"
 mkdir -p "$DIST_DIR"
 rm -rf "$PACKAGE_ROOT"
 mkdir -p \
@@ -59,29 +59,29 @@ mkdir -p \
   "$PACKAGE_ROOT/usr/share/icons/hicolor/256x256/apps"
 
 cp -a "$BUNDLE_DIR/." "$APP_DIR/"
-ln -s /opt/android-log-center/android_log_center \
-  "$PACKAGE_ROOT/usr/bin/android-log-center"
+ln -s /opt/log4app/log4app \
+  "$PACKAGE_ROOT/usr/bin/log4app"
 install -m 0644 \
   "$ROOT/packaging/linux/android-log-center.png" \
-  "$PACKAGE_ROOT/usr/share/icons/hicolor/256x256/apps/android-log-center.png"
+  "$PACKAGE_ROOT/usr/share/icons/hicolor/256x256/apps/log4app.png"
 install -m 0644 \
   "$ROOT/packaging/linux/android-log-center.desktop" \
-  "$PACKAGE_ROOT/usr/share/applications/android-log-center.desktop"
+  "$PACKAGE_ROOT/usr/share/applications/log4app.desktop"
 
 cat > "$PACKAGE_ROOT/DEBIAN/control" <<EOF
-Package: android-log-center
+Package: log4app
 Version: $VERSION
 Section: utils
 Priority: optional
 Architecture: $DEB_ARCH
 Depends: libgtk-3-0 | libgtk-3-0t64, libblkid1, liblzma5, libstdc++6
-Maintainer: Android Log Center
-Description: LAN log collector for Android devices
- Receives Android device heartbeats and uploaded log archives over the local network.
+Maintainer: Log4App
+Description: LAN log collector for apps and devices
+ Receives device heartbeats and uploaded app log archives over the local network.
 EOF
 
-DEB_PATH="$DIST_DIR/android-log-center_${VERSION}_${DEB_ARCH}.deb"
-TAR_PATH="$DIST_DIR/AndroidLogCenter-$VERSION-linux-$FLUTTER_ARCH.tar.gz"
+DEB_PATH="$DIST_DIR/log4app_${VERSION}_${DEB_ARCH}.deb"
+TAR_PATH="$DIST_DIR/Log4App-$VERSION-linux-$FLUTTER_ARCH.tar.gz"
 rm -f "$DEB_PATH" "$TAR_PATH"
 dpkg-deb --build --root-owner-group "$PACKAGE_ROOT" "$DEB_PATH"
 tar -C "$BUNDLE_DIR" -czf "$TAR_PATH" .

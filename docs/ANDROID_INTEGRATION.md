@@ -31,6 +31,8 @@ suspend fun uploadLogs(
         .setType(MultipartBody.FORM)
         .addFormDataPart("deviceId", deviceId)
         .addFormDataPart("appVersion", appVersion)
+        .addFormDataPart("platform", "Android")
+        .addFormDataPart("platformVersion", Build.VERSION.RELEASE)
         .addFormDataPart(
             "file",
             zipFile.name,
@@ -69,7 +71,9 @@ GET http://192.168.31.52:9090/api/log/ping
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---:|---|
 | file | File | 是 | ZIP 或其他日志包 |
-| deviceId | String | 否 | 设备标识，缺失时使用 unknown-device |
+| deviceId | String | 是 | 稳定设备标识 |
 | appVersion | String | 否 | App 版本 |
+| platform | String | 否 | 平台名称；Android 客户端填写 `Android` |
+| platformVersion | String | 否 | 系统版本 |
 
 V2 最大单文件默认 500 MB。

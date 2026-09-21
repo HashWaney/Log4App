@@ -5,7 +5,7 @@ BASE_URL="${1:-http://127.0.0.1:9090}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-echo "Android Log Center V2.1 smoke test"
+echo "Log4App V2.1 smoke test"
 echo "Server: $BASE_URL"
 echo
 
@@ -18,12 +18,12 @@ echo "[2/4] POST /api/device/ping"
 curl --fail --silent --show-error \
   -X POST \
   -H 'Content-Type: application/json' \
-  -d '{"deviceId":"TEST_001","deviceName":"Smoke Test Android","appVersion":"1.0.0","androidVersion":"14"}' \
+  -d '{"deviceId":"TEST_001","deviceName":"Smoke Test Device","appVersion":"1.0.0","platform":"Test","platformVersion":"1.0"}' \
   "$BASE_URL/api/device/ping"
 echo
 echo
 
-echo "test log from Android Log Center smoke test" > "$TMP_DIR/app.log"
+echo "test log from Log4App smoke test" > "$TMP_DIR/app.log"
 (
   cd "$TMP_DIR"
   if command -v zip >/dev/null 2>&1; then
@@ -37,9 +37,10 @@ echo "[3/4] POST /api/log/upload"
 curl --fail --silent --show-error \
   -X POST \
   -F 'deviceId=TEST_001' \
-  -F 'deviceName=Smoke Test Android' \
+  -F 'deviceName=Smoke Test Device' \
   -F 'appVersion=1.0.0' \
-  -F 'androidVersion=14' \
+  -F 'platform=Test' \
+  -F 'platformVersion=1.0' \
   -F "file=@$TMP_DIR/test.zip" \
   "$BASE_URL/api/log/upload"
 echo

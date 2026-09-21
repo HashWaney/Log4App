@@ -1,17 +1,17 @@
-# Android Log Center — Flutter Desktop V2.1
+# Log4App — Flutter Desktop V2.1
 
-Windows、macOS、Linux 局域网 Android 日志收集工具。
+Windows、macOS、Linux 跨平台局域网 App 日志收集工具。
 
 V2.1 服务端重点：
 
 - Flutter Desktop 单进程运行，不再依赖 Spring Boot/JRE/Maven。
 - `dart:io HttpServer` 监听 `0.0.0.0:9090`。
 - 自动检测局域网 IPv4。
-- 根据当前 IP 动态生成 Android 扫码二维码。
+- 根据当前 IP 动态生成采集端 App 扫码二维码。
 - IP 改变后二维码自动刷新。
-- Android `POST /api/device/ping` 后桌面登记并显示设备。
+- 采集端 App `POST /api/device/ping` 后桌面登记并显示设备。
 - 设备 90 秒内有通信显示“已连接”。
-- Android 日志 Multipart 上传。
+- App 日志 Multipart 上传。
 - 最大上传包默认 500 MB。
 - 上传后显示设备最后上传时间/大小。
 - 最近日志列表。
@@ -25,6 +25,7 @@ V2.1 服务端重点：
 ```json
 {
   "type": "android-log-center",
+  "serviceName": "Log4App",
   "version": 1,
   "scheme": "http",
   "host": "172.16.50.167",
@@ -33,13 +34,16 @@ V2.1 服务端重点：
 }
 ```
 
-Android 扫码后应调用：
+采集端 App 扫码后应调用：
 
 ```text
 POST {baseUrl}/api/device/ping
 ```
 
-Ping 成功后桌面端会出现该 Android 设备。
+Ping 成功后桌面端会出现该设备。
+
+> `android-log-center` 是 V2.1 已发布的协议兼容标识，不再作为产品品牌展示；
+> 已接入的 Android 客户端无需因本次改名而调整扫码判断。
 
 完整协议见：`docs/SERVER_API.md`。
 
@@ -51,7 +55,7 @@ cd AndroidLogCenter-Flutter-V2.1
 flutter run -d macos
 ```
 
-第一次有 Android 访问时，macOS 防火墙可能提示是否允许入站连接，应选择允许。
+第一次有采集端 App 访问时，macOS 防火墙可能提示是否允许入站连接，应选择允许。
 
 验证：
 
@@ -64,11 +68,11 @@ curl http://127.0.0.1:9090/api/server/info
 ```bash
 curl -X POST \
   -H 'Content-Type: application/json' \
-  -d '{"deviceId":"TEST_001","deviceName":"Test Android","appVersion":"1.0.0","androidVersion":"14"}' \
+  -d '{"deviceId":"TEST_001","deviceName":"Test Device","appVersion":"1.0.0","platform":"Android","platformVersion":"14"}' \
   http://127.0.0.1:9090/api/device/ping
 ```
 
-此时桌面“Android 设备”区域应出现 `Test Android` 并显示“已连接”。
+此时桌面“已登记设备”区域应出现 `Test Device` 并显示“已连接”。
 
 ## macOS Release
 
@@ -89,7 +93,7 @@ V2.1 的 bootstrap 会把以下 entitlement 写入 Debug/Profile 和 Release：
 <true/>
 ```
 
-这是因为应用本身需要监听 9090 接受 Android 的入站 TCP 连接。
+这是因为应用本身需要监听 9090 接受采集端设备的入站 TCP 连接。
 
 ## 桌面平台构建说明
 
@@ -135,8 +139,8 @@ flutter config --enable-windows-desktop
 输出：
 
 ```text
-dist/windows/AndroidLogCenter-2.1.0-windows-x64-setup.exe
-dist/windows/AndroidLogCenter-2.1.0-windows-x64-portable.zip
+dist/windows/Log4App-2.1.0-windows-x64-setup.exe
+dist/windows/Log4App-2.1.0-windows-x64-portable.zip
 ```
 
 安装器会创建开始菜单入口、可选桌面快捷方式，并为应用添加仅限“专用网络”的
@@ -169,18 +173,18 @@ chmod +x scripts/build-linux.sh
 输出（x64 示例）：
 
 ```text
-dist/linux/android-log-center_2.1.0_amd64.deb
-dist/linux/AndroidLogCenter-2.1.0-linux-x64.tar.gz
+dist/linux/log4app_2.1.0_amd64.deb
+dist/linux/Log4App-2.1.0-linux-x64.tar.gz
 ```
 
 安装并启动 `.deb`：
 
 ```bash
-sudo apt install ./dist/linux/android-log-center_2.1.0_amd64.deb
-android-log-center
+sudo apt install ./dist/linux/log4app_2.1.0_amd64.deb
+log4app
 ```
 
-也可以从桌面应用菜单启动。如果系统启用了 UFW，并且 Android 设备无法连接，
+也可以从桌面应用菜单启动。如果系统启用了 UFW，并且采集端设备无法连接，
 需要显式允许同一局域网访问 9090，例如：
 
 ```bash
@@ -194,11 +198,14 @@ sudo ufw allow from 192.168.0.0/16 to any port 9090 proto tcp
 使用 Flutter `path_provider` 的 Application Documents Directory，再创建：
 
 ```text
-AndroidDeviceLogs/
+Log4AppLogs/
 └── DEVICE_ID/
     └── yyyy-MM-dd/
         └── timestamp_appVersion_originalName.zip
 ```
+
+首次启动时，如果只检测到旧版 `AndroidDeviceLogs` 目录，Log4App 会优先将它迁移为
+`Log4AppLogs`；如果系统阻止重命名，则继续使用旧目录，避免已有日志不可见。
 
 这样 macOS App Sandbox 下也能稳定写入，而不是硬编码真实 `~/Documents`。
 
@@ -247,4 +254,4 @@ qr_flutter: ^4.1.0
 /api/device/list
 ```
 
-全部成功后输出 `PASS`，同时桌面端会出现一台 `Smoke Test Android` 设备和一条测试日志。
+全部成功后输出 `PASS`，同时桌面端会出现一台 `Smoke Test Device` 设备和一条测试日志。

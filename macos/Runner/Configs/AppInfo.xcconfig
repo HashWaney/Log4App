@@ -5,10 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = android_log_center
+PRODUCT_NAME = Log4App
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.androidLogCenter
+PRODUCT_BUNDLE_IDENTIFIER = com.example.log4app
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.

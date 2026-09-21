@@ -1,10 +1,10 @@
-import 'package:android_log_center/app.dart';
+import 'package:log4app/app.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('renders Android Log Center shell', (WidgetTester tester) async {
-    await tester.pumpWidget(const AndroidLogCenterApp());
+  testWidgets('renders Log4App shell', (WidgetTester tester) async {
+    await tester.pumpWidget(const Log4App());
 
-    expect(find.text('Android Log Center'), findsOneWidget);
+    expect(find.text('Log4App'), findsOneWidget);
   });
 }

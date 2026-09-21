@@ -6,7 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import '../models/log_entry.dart';
 
 class LogStorageService {
-  LogStorageService({Directory? rootDirectory}) : _rootDirectory = rootDirectory;
+  LogStorageService({Directory? rootDirectory})
+      : _rootDirectory = rootDirectory;
 
   Directory? _rootDirectory;
 
@@ -19,9 +20,21 @@ class LogStorageService {
   }
 
   Future<void> ensureReady() async {
-    _rootDirectory ??= Directory(
-      p.join((await getApplicationDocumentsDirectory()).path, 'AndroidDeviceLogs'),
-    );
+    if (_rootDirectory == null) {
+      final documents = await getApplicationDocumentsDirectory();
+      final preferred = Directory(p.join(documents.path, 'Log4AppLogs'));
+      final legacy = Directory(p.join(documents.path, 'AndroidDeviceLogs'));
+
+      if (!await preferred.exists() && await legacy.exists()) {
+        try {
+          _rootDirectory = await legacy.rename(preferred.path);
+        } on FileSystemException {
+          // Keep existing logs accessible if an in-place migration is blocked.
+          _rootDirectory = legacy;
+        }
+      }
+      _rootDirectory ??= preferred;
+    }
     await _rootDirectory!.create(recursive: true);
   }
 
@@ -35,7 +48,8 @@ class LogStorageService {
     await ensureReady();
 
     final now = DateTime.now();
-    final safeDevice = _sanitize(deviceId.isEmpty ? 'unknown-device' : deviceId);
+    final safeDevice =
+        _sanitize(deviceId.isEmpty ? 'unknown-device' : deviceId);
     final safeVersion = _sanitize(appVersion.isEmpty ? 'unknown' : appVersion);
     final safeOriginal = _sanitizeFileName(
       originalFileName.isEmpty ? 'logs.zip' : originalFileName,
