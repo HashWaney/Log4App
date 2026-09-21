@@ -20,6 +20,7 @@ def signed_webhook(webhook: str, secret: str) -> str:
 
     timestamp = str(round(time.time() * 1000))
     string_to_sign = f"{timestamp}\n{secret}".encode("utf-8")
+
     digest = hmac.new(
         secret.encode("utf-8"),
         string_to_sign,
@@ -41,12 +42,15 @@ def display_result(value: str) -> str:
         "failure": "❌ 失败",
         "cancelled": "⚪ 已取消",
         "skipped": "⏭️ 已跳过",
+        "unknown": "❔ 未知",
     }
+
     return labels.get(value, value or "未知")
 
 
 def main() -> None:
     webhook = env("DINGTALK_WEBHOOK")
+
     if not webhook:
         print(
             "DINGTALK_WEBHOOK is not configured; "
@@ -56,28 +60,50 @@ def main() -> None:
 
     is_release = env("IS_RELEASE").lower() == "true"
 
+    # build-linux 是 matrix job：
+    #
+    #   Linux x64
+    #   Linux ARM64
+    #
+    # GitHub Actions 的 needs.build-linux.result
+    # 表示整个 matrix job 的最终结果。
+    #
+    # 因此当前 Linux 两个架构共用 LINUX_RESULT。
+    linux_result = env("LINUX_RESULT", "unknown")
+
     results = {
         "Windows x64": env("WINDOWS_RESULT", "unknown"),
         "macOS ARM64": env("MACOS_RESULT", "unknown"),
-        "Linux x64": env("LINUX_RESULT", "unknown"),
+        "Linux x64": linux_result,
+        "Linux ARM64": linux_result,
         "GitHub Release": env("RELEASE_RESULT", "unknown"),
     }
 
-    # 三个平台构建结果始终参与 CI 成败判断
+    # 三个平台 / 四个架构始终参与 CI 成败判断。
+    #
+    # Linux x64 / ARM64 当前来自同一个 matrix job，
+    # 所以这里直接使用两个展示项即可。
     required_results = [
         results["Windows x64"],
         results["macOS ARM64"],
         results["Linux x64"],
+        results["Linux ARM64"],
     ]
 
-    # 只有 Tag Release 时才要求 GitHub Release 成功
+    # 只有正式 Tag Release 时才要求 GitHub Release 成功。
     if is_release:
-        required_results.append(results["GitHub Release"])
+        required_results.append(
+            results["GitHub Release"]
+        )
 
-    succeeded = all(result == "success" for result in required_results)
+    succeeded = all(
+        result == "success"
+        for result in required_results
+    )
 
     status_text = "成功" if succeeded else "失败"
     status_icon = "✅" if succeeded else "❌"
+
     title = f"{status_icon} Log4App CI {status_text}"
 
     repository = env("REPOSITORY")
@@ -95,7 +121,9 @@ def main() -> None:
         for name, result in results.items()
     )
 
+    # ------------------------------------------------------------
     # 链接区域
+    # ------------------------------------------------------------
     link_lines = []
 
     if run_url:
@@ -103,9 +131,9 @@ def main() -> None:
             f"[🔍 查看 GitHub Actions 运行详情]({run_url})"
         )
 
-    # 只有正式 Tag Release 才显示安装包下载地址
+    # 只有正式 Tag Release 才显示安装包下载地址。
     if is_release and release_url:
-        link_lines.append(f"\n")
+        link_lines.append("")
         link_lines.append(
             f"[📦 下载 {ref_name} Release 安装包]({release_url})"
         )
@@ -117,6 +145,8 @@ def main() -> None:
         f"- 触发：{event_name} / {ref_name}",
         f"- 提交：`{short_sha}`",
         f"- 操作者：{actor}",
+        "",
+        "### 🛠️ 构建结果",
         "",
         result_lines,
     ]
@@ -151,7 +181,7 @@ def main() -> None:
             ensure_ascii=False,
         ).encode("utf-8"),
         headers={
-            "Content-Type": "application/json; charset=utf-8"
+            "Content-Type": "application/json; charset=utf-8",
         },
         method="POST",
     )

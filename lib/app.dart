@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'screens/home_page.dart';
@@ -17,6 +18,9 @@ class Log4App extends StatelessWidget {
       title: 'Log4App',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3F6AE0)),
+        fontFamily: defaultTargetPlatform == TargetPlatform.linux
+            ? 'NotoSansSC'
+            : null,
         useMaterial3: true,
       ),
       home: HomePage(serverVersion: serverVersion),
