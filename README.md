@@ -1,10 +1,12 @@
 # Log4App — Flutter Desktop V2.1
 
+![图](image.png)
+
 Windows、macOS、Linux 跨平台局域网 App 日志收集工具。
 
 V2.1 服务端重点：
 
-- Flutter Desktop 单进程运行，不再依赖 Spring Boot/JRE/Maven。
+- Flutter Desktop 单进程运行
 - `dart:io HttpServer` 监听 `0.0.0.0:9090`。
 - 自动检测局域网 IPv4。
 - 根据当前 IP 动态生成采集端 App 扫码二维码。
