@@ -121,475 +121,457 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  build-linux:
-    name: Build Linux ${{ matrix.name }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: x64
-            runner: ubuntu-24.04
-            artifact_name: log4app-linux-x64
+    build-linux:
+      name: Build Linux ${{ matrix.name }}
 
-          - name: ARM64
-            runner: ubuntu-24.04-arm
-            artifact_name: log4app-linux-arm64
+      strategy:
+        fail-fast: false
+        matrix:
+          include:
+            - name: x64
+              runner: ubuntu-24.04
+              flutter_arch: x64
+              artifact_name: log4app-linux-x64
 
-    runs-on: ${{ matrix.runner }}
+            - name: ARM64
+              runner: ubuntu-24.04-arm
+              flutter_arch: arm64
+              artifact_name: log4app-linux-arm64
 
-    container:
-      image: ubuntu:20.04
-      env:
-        DEBIAN_FRONTEND: noninteractive
+      runs-on: ${{ matrix.runner }}
 
-    timeout-minutes: 60
-
-    steps:
-      # ============================================================
-      # 1. 安装 Linux 编译依赖
-      # ============================================================
-      - name: Install Linux build dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          apt-get update
-
-          apt-get install --yes --no-install-recommends \
-            binutils \
-            ca-certificates \
-            clang \
-            lld-10 \
-            cmake \
-            curl \
-            file \
-            git \
-            jq \
-            libblkid-dev \
-            libgtk-3-dev \
-            liblzma-dev \
-            libstdc++-9-dev \
-            ninja-build \
-            pkg-config \
-            tar \
-            unzip \
-            xz-utils \
-            zip
-
-      # ============================================================
-      # 2. 判断当前 Runner 的真实 CPU 架构
-      #
-      # 不依赖 matrix.flutter_arch，
-      # 防止再次出现 matrix 变量为空的问题。
-      # ============================================================
-      - name: Detect Linux architecture
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          MACHINE_ARCH="$(uname -m)"
-
-          case "$MACHINE_ARCH" in
-            x86_64)
-              FLUTTER_ARCH="x64"
-              DEB_ARCH="amd64"
-              ;;
-
-            aarch64|arm64)
-              FLUTTER_ARCH="arm64"
-              DEB_ARCH="arm64"
-              ;;
-
-            *)
-              echo "Unsupported Linux architecture: $MACHINE_ARCH" >&2
-              exit 1
-              ;;
-          esac
-
-          echo "MACHINE_ARCH=$MACHINE_ARCH" >> "$GITHUB_ENV"
-          echo "FLUTTER_ARCH=$FLUTTER_ARCH" >> "$GITHUB_ENV"
-          echo "DEB_ARCH=$DEB_ARCH" >> "$GITHUB_ENV"
-
-          echo "========================================"
-          echo "Linux architecture"
-          echo "========================================"
-          echo "Machine : $MACHINE_ARCH"
-          echo "Flutter : $FLUTTER_ARCH"
-          echo "Debian  : $DEB_ARCH"
-
-      # ============================================================
-      # 3. Checkout 当前项目
-      # ============================================================
-      - name: Check out source
-        uses: actions/checkout@v6
-
-      # ============================================================
-      # 4. x64 Flutter
-      #
-      # Flutter 3.38.5 官方提供 Linux x64 SDK，
-      # 所以 x64 继续使用 flutter-action。
-      # ============================================================
-      - name: Set up Flutter x64
-        if: env.FLUTTER_ARCH == 'x64'
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-          architecture: x64
-
-      # ============================================================
-      # 5. ARM64 Flutter
-      #
-      # Flutter 3.38.5 没有可供 flutter-action 获取的
-      # Linux ARM64 SDK archive。
-      #
-      # 因此 ARM64 Runner 直接 checkout Flutter 3.38.5 源码，
-      # Flutter 自身会按照 aarch64 主机下载 ARM64 Dart SDK。
-      # ============================================================
-      - name: Set up Flutter ARM64
-        if: env.FLUTTER_ARCH == 'arm64'
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          FLUTTER_DIR="/opt/flutter"
-
-          echo "========================================"
-          echo "Install Flutter ARM64"
-          echo "========================================"
-
-          rm -rf "$FLUTTER_DIR"
-
-          git clone \
-            --depth 1 \
-            --branch "${FLUTTER_VERSION}" \
-            https://github.com/flutter/flutter.git \
-            "$FLUTTER_DIR"
-
-          git config --global --add safe.directory "$FLUTTER_DIR"
-
-          echo "FLUTTER_ROOT=$FLUTTER_DIR" >> "$GITHUB_ENV"
-          echo "$FLUTTER_DIR/bin" >> "$GITHUB_PATH"
-          echo "$FLUTTER_DIR/bin/cache/dart-sdk/bin" >> "$GITHUB_PATH"
-
-          echo
-          echo "Bootstrapping Flutter..."
-
-          "$FLUTTER_DIR/bin/flutter" --version
-
-      # ============================================================
-      # 6. 信任 Flutter SDK
-      # ============================================================
-      - name: Trust Flutter SDK
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "FLUTTER_ROOT=$FLUTTER_ROOT"
-
-          git config --global --add safe.directory "$FLUTTER_ROOT"
-
-      # ============================================================
-      # 7. 验证 Flutter / Dart
-      # ============================================================
-      - name: Verify Flutter environment
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "========================================"
-          echo "Flutter root"
-          echo "========================================"
-          echo "$FLUTTER_ROOT"
-
-          echo
-          echo "========================================"
-          echo "Flutter"
-          echo "========================================"
-          command -v flutter
-          flutter --version
-
-          echo
-          echo "========================================"
-          echo "Dart"
-          echo "========================================"
-          command -v dart
-          dart --version
-
-          echo
-          echo "========================================"
-          echo "Host"
-          echo "========================================"
-          uname -a
-
-          echo
-          echo "MACHINE_ARCH=$MACHINE_ARCH"
-          echo "FLUTTER_ARCH=$FLUTTER_ARCH"
-          echo "DEB_ARCH=$DEB_ARCH"
-
-      # ============================================================
-      # 8. 启用并缓存 Linux Desktop artifacts
-      # ============================================================
-      - name: Precache Linux artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          flutter config --enable-linux-desktop
-          flutter precache --linux
-
-      # ============================================================
-      # 9. 验证 Linux 原生编译工具链
-      #
-      # clang:
-      #   Flutter/CMake C/C++ 编译器
-      #
-      # lld-10:
-      #   Dart native assets 会寻找：
-      #   /usr/lib/llvm-10/bin/ld.lld
-      # ============================================================
-      - name: Verify Linux toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "========================================"
-          echo "Operating system"
-          echo "========================================"
-          cat /etc/os-release
-
-          echo
-          echo "========================================"
-          echo "Architecture"
-          echo "========================================"
-          uname -m
-          dpkg --print-architecture
-
-          echo
-          echo "========================================"
-          echo "GLIBC"
-          echo "========================================"
-          ldd --version | head -n 1
-
-          echo
-          echo "========================================"
-          echo "clang"
-          echo "========================================"
-          command -v clang
-          clang --version
-
-          echo
-          echo "========================================"
-          echo "clang++"
-          echo "========================================"
-          command -v clang++
-          clang++ --version
-
-          echo
-          echo "========================================"
-          echo "LLD"
-          echo "========================================"
-
-          if [ ! -x /usr/lib/llvm-10/bin/ld.lld ]; then
-            echo "/usr/lib/llvm-10/bin/ld.lld not found." >&2
-            exit 1
-          fi
-
-          /usr/lib/llvm-10/bin/ld.lld --version
-
-          echo
-          echo "========================================"
-          echo "CMake"
-          echo "========================================"
-          cmake --version
-
-          echo
-          echo "========================================"
-          echo "Ninja"
-          echo "========================================"
-          ninja --version
-
-      # ============================================================
-      # 10. Flutter doctor
-      # ============================================================
-      - name: Flutter doctor
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          flutter doctor -v
-
-      # ============================================================
-      # 11. 构建 Linux
-      #
-      # build-linux.sh 自己根据 uname -m 决定：
-      #
-      # x86_64
-      #   -> build/linux/x64
-      #   -> amd64.deb
-      #
-      # aarch64
-      #   -> build/linux/arm64
-      #   -> arm64.deb
-      # ============================================================
-      - name: Build Linux packages
-        shell: bash
+      container:
+        image: ubuntu:20.04
         env:
-          MAX_GLIBC_VERSION: "2.31"
-        run: |
-          set -euo pipefail
+          DEBIAN_FRONTEND: noninteractive
 
-          echo "========================================"
-          echo "Build Linux"
-          echo "========================================"
-          echo "MACHINE_ARCH=$MACHINE_ARCH"
-          echo "FLUTTER_ARCH=$FLUTTER_ARCH"
-          echo "DEB_ARCH=$DEB_ARCH"
+      timeout-minutes: 60
 
-          chmod +x ./scripts/build-linux.sh
+      steps:
+        # ============================================================
+        # 1. 安装 Linux 编译依赖
+        # ============================================================
+        - name: Install Linux build dependencies
+          shell: bash
+          run: |
+            set -euo pipefail
 
-          ./scripts/build-linux.sh
+            apt-get update
 
-      # ============================================================
-      # 12. 验证生成的 Linux 包
-      #
-      # 这里不再使用 matrix.flutter_arch。
-      # 全部使用 Detect Linux architecture 步骤产生的环境变量。
-      # ============================================================
-      - name: Verify Linux packages
-        shell: bash
-        run: |
-          set -euo pipefail
+            apt-get install --yes --no-install-recommends \
+              binutils \
+              ca-certificates \
+              clang \
+              lld-10 \
+              cmake \
+              curl \
+              file \
+              git \
+              jq \
+              libblkid-dev \
+              libgtk-3-dev \
+              liblzma-dev \
+              libstdc++-9-dev \
+              ninja-build \
+              pkg-config \
+              tar \
+              unzip \
+              xz-utils \
+              zip
 
-          echo "========================================"
-          echo "Generated Linux packages"
-          echo "========================================"
+        # ============================================================
+        # 2. 检测实际 Linux 架构
+        #
+        # 同时校验 Runner 实际架构是否和 Matrix 一致。
+        # ============================================================
+        - name: Detect Linux architecture
+          shell: bash
+          env:
+            EXPECTED_FLUTTER_ARCH: ${{ matrix.flutter_arch }}
+          run: |
+            set -euo pipefail
 
-          find dist/linux -maxdepth 1 -type f -print
+            MACHINE_ARCH="$(uname -m)"
 
-          echo
-          echo "========================================"
-          echo "Expected architecture"
-          echo "========================================"
+            case "$MACHINE_ARCH" in
+              x86_64)
+                FLUTTER_ARCH="x64"
+                DEB_ARCH="amd64"
+                ;;
 
-          echo "MACHINE_ARCH=$MACHINE_ARCH"
-          echo "FLUTTER_ARCH=$FLUTTER_ARCH"
-          echo "DEB_ARCH=$DEB_ARCH"
+              aarch64|arm64)
+                FLUTTER_ARCH="arm64"
+                DEB_ARCH="arm64"
+                ;;
 
-          case "$FLUTTER_ARCH" in
-            x64)
-              EXPECTED_ELF_PATTERN="x86-64"
-              ;;
+              *)
+                echo "Unsupported Linux architecture: $MACHINE_ARCH" >&2
+                exit 1
+                ;;
+            esac
 
-            arm64)
-              EXPECTED_ELF_PATTERN="ARM aarch64|aarch64"
-              ;;
+            echo "========================================"
+            echo "Linux architecture"
+            echo "========================================"
+            echo "Machine  : $MACHINE_ARCH"
+            echo "Flutter  : $FLUTTER_ARCH"
+            echo "Debian   : $DEB_ARCH"
+            echo "Expected : $EXPECTED_FLUTTER_ARCH"
 
-            *)
-              echo "Unsupported Flutter architecture: $FLUTTER_ARCH" >&2
+            if [ "$FLUTTER_ARCH" != "$EXPECTED_FLUTTER_ARCH" ]; then
+              echo "Runner architecture mismatch." >&2
+              echo "Expected: $EXPECTED_FLUTTER_ARCH" >&2
+              echo "Actual:   $FLUTTER_ARCH" >&2
               exit 1
-              ;;
-          esac
+            fi
 
-          # --------------------------------------------------------
-          # 找 DEB
-          # --------------------------------------------------------
-          DEB_FILE="$(find dist/linux \
-            -maxdepth 1 \
-            -type f \
-            -name "log4app_*_${DEB_ARCH}.deb" \
-            -print \
-            -quit)"
+            echo "MACHINE_ARCH=$MACHINE_ARCH" >> "$GITHUB_ENV"
+            echo "FLUTTER_ARCH=$FLUTTER_ARCH" >> "$GITHUB_ENV"
+            echo "DEB_ARCH=$DEB_ARCH" >> "$GITHUB_ENV"
 
-          if [ -z "$DEB_FILE" ]; then
-            echo "Expected DEB package was not generated." >&2
-            echo "Expected Debian architecture: $DEB_ARCH" >&2
+        # ============================================================
+        # 3. 验证 Linux 编译工具链
+        # ============================================================
+        - name: Verify Linux toolchain
+          shell: bash
+          run: |
+            set -euo pipefail
 
-            echo
-            echo "dist/linux contains:"
-            find dist/linux -maxdepth 1 -type f -print >&2
-
-            exit 1
-          fi
-
-          echo
-          echo "========================================"
-          echo "DEB package"
-          echo "========================================"
-
-          echo "$DEB_FILE"
-
-          ACTUAL_DEB_ARCH="$(dpkg-deb -f "$DEB_FILE" Architecture)"
-
-          echo "Expected : $DEB_ARCH"
-          echo "Actual   : $ACTUAL_DEB_ARCH"
-
-          if [ "$ACTUAL_DEB_ARCH" != "$DEB_ARCH" ]; then
-            echo "DEB architecture mismatch." >&2
-            echo "Expected: $DEB_ARCH" >&2
-            echo "Actual:   $ACTUAL_DEB_ARCH" >&2
-            exit 1
-          fi
-
-          # --------------------------------------------------------
-          # 找 Flutter bundle executable
-          # --------------------------------------------------------
-          BUNDLE_EXECUTABLE="build/linux/${FLUTTER_ARCH}/release/bundle/log4app"
-
-          echo
-          echo "========================================"
-          echo "Release executable"
-          echo "========================================"
-
-          echo "$BUNDLE_EXECUTABLE"
-
-          if [ ! -f "$BUNDLE_EXECUTABLE" ]; then
-            echo "Linux executable not found:" >&2
-            echo "$BUNDLE_EXECUTABLE" >&2
+            echo "=== PATH ==="
+            echo "$PATH"
 
             echo
-            echo "Available Linux build files:" >&2
-            find build/linux -maxdepth 5 -type f \
-              -name "log4app" \
-              -print >&2 || true
+            echo "=== Architecture ==="
+            uname -m
+            dpkg --print-architecture
 
-            exit 1
-          fi
+            echo
+            echo "=== GLIBC ==="
+            ldd --version | head -n 1
 
-          FILE_INFO="$(file "$BUNDLE_EXECUTABLE")"
+            echo
+            echo "=== clang ==="
+            command -v clang
+            ls -l "$(command -v clang)"
+            clang --version
 
-          echo "$FILE_INFO"
+            echo
+            echo "=== clang++ ==="
+            command -v clang++
+            ls -l "$(command -v clang++)"
+            clang++ --version
 
-          if ! echo "$FILE_INFO" | grep -Eq "$EXPECTED_ELF_PATTERN"; then
-            echo "Executable architecture mismatch." >&2
-            echo "Expected pattern: $EXPECTED_ELF_PATTERN" >&2
-            echo "Actual: $FILE_INFO" >&2
-            exit 1
-          fi
+            echo
+            echo "=== linker ==="
+            test -x /usr/lib/llvm-10/bin/ld.lld
+            /usr/lib/llvm-10/bin/ld.lld --version
 
-          echo
-          echo "========================================"
-          echo "Linux package verification PASSED"
-          echo "========================================"
-          echo "Flutter architecture : $FLUTTER_ARCH"
-          echo "Debian architecture  : $DEB_ARCH"
-          echo "DEB                   : $DEB_FILE"
-          echo "Executable            : $BUNDLE_EXECUTABLE"
+            echo
+            echo "=== stdc++ ==="
+            ldconfig -p | grep libstdc++ || true
 
-      # ============================================================
-      # 13. 上传构建结果
-      # ============================================================
-      - name: Upload Linux packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: dist/linux/*
-          if-no-files-found: error
-          retention-days: 14
-        name: Build Linux ${{ matrix.name }}
+            echo
+            echo "=== cmake ==="
+            cmake --version
 
-  
+            echo
+            echo "=== ninja ==="
+            ninja --version
+
+        # ============================================================
+        # 4. Checkout 项目
+        # ============================================================
+        - name: Check out source
+          uses: actions/checkout@v6
+
+        # ============================================================
+        # 5. x64 Flutter
+        #
+        # Flutter 3.38.5 Linux x64 可以正常通过 flutter-action 安装。
+        # ============================================================
+        - name: Set up Flutter x64
+          if: matrix.flutter_arch == 'x64'
+          uses: subosito/flutter-action@v2
+          with:
+            flutter-version: ${{ env.FLUTTER_VERSION }}
+            channel: stable
+            cache: true
+            architecture: x64
+
+        # ============================================================
+        # 6. ARM64 Flutter
+        #
+        # Flutter 3.38.5 没有供 flutter-action 使用的
+        # Linux ARM64 release archive。
+        #
+        # 因此直接 checkout Flutter 3.38.5 源码。
+        # Flutter 启动时会根据 aarch64 主机拉取 ARM64 Dart SDK。
+        # ============================================================
+        - name: Set up Flutter ARM64
+          if: matrix.flutter_arch == 'arm64'
+          shell: bash
+          run: |
+            set -euo pipefail
+
+            FLUTTER_DIR="/opt/flutter"
+
+            echo "========================================"
+            echo "Install Flutter ${FLUTTER_VERSION} ARM64"
+            echo "========================================"
+
+            rm -rf "$FLUTTER_DIR"
+
+            git clone \
+              --depth 1 \
+              --branch "${FLUTTER_VERSION}" \
+              https://github.com/flutter/flutter.git \
+              "$FLUTTER_DIR"
+
+            git config --global --add safe.directory "$FLUTTER_DIR"
+
+            echo "FLUTTER_ROOT=$FLUTTER_DIR" >> "$GITHUB_ENV"
+            echo "$FLUTTER_DIR/bin" >> "$GITHUB_PATH"
+            echo "$FLUTTER_DIR/bin/cache/dart-sdk/bin" >> "$GITHUB_PATH"
+
+            echo
+            echo "Bootstrapping Flutter ARM64..."
+
+            "$FLUTTER_DIR/bin/flutter" --version
+
+        # ============================================================
+        # 7. Trust Flutter SDK
+        # ============================================================
+        - name: Trust Flutter SDK checkout in container
+          shell: bash
+          run: |
+            set -euo pipefail
+
+            echo "FLUTTER_ROOT=$FLUTTER_ROOT"
+
+            git config --global --add safe.directory "$FLUTTER_ROOT"
+
+        # ============================================================
+        # 8. 验证 Flutter / Dart
+        # ============================================================
+        - name: Verify Flutter environment
+          shell: bash
+          run: |
+            set -euo pipefail
+
+            echo "========================================"
+            echo "Architecture"
+            echo "========================================"
+            echo "MACHINE_ARCH=$MACHINE_ARCH"
+            echo "FLUTTER_ARCH=$FLUTTER_ARCH"
+            echo "DEB_ARCH=$DEB_ARCH"
+
+            echo
+            echo "========================================"
+            echo "Flutter"
+            echo "========================================"
+            command -v flutter
+            flutter --version
+
+            echo
+            echo "========================================"
+            echo "Dart"
+            echo "========================================"
+            command -v dart
+            dart --version
+
+        # ============================================================
+        # 9. Linux Desktop artifacts
+        # ============================================================
+        - name: Precache Linux artifacts
+          shell: bash
+          run: |
+            set -euo pipefail
+
+            flutter config --enable-linux-desktop
+            flutter precache --linux
+
+        # ============================================================
+        # 10. Flutter doctor
+        # ============================================================
+        - name: Flutter doctor
+          shell: bash
+          run: |
+            set -euo pipefail
+
+            flutter doctor -v
+
+        # ============================================================
+        # 11. 构建 Linux
+        #
+        # build-linux.sh 根据 uname -m 自动产生：
+        #
+        # x86_64:
+        #   build/linux/x64
+        #   log4app_xxx_amd64.deb
+        #
+        # ARM64:
+        #   build/linux/arm64
+        #   log4app_xxx_arm64.deb
+        # ============================================================
+        - name: Build Linux packages
+          shell: bash
+          env:
+            MAX_GLIBC_VERSION: "2.31"
+            EXPECTED_FLUTTER_ARCH: ${{ matrix.flutter_arch }}
+          run: |
+            set -euo pipefail
+
+            echo "========================================"
+            echo "Build Linux"
+            echo "========================================"
+            echo "MACHINE_ARCH=$MACHINE_ARCH"
+            echo "FLUTTER_ARCH=$FLUTTER_ARCH"
+            echo "DEB_ARCH=$DEB_ARCH"
+            echo "EXPECTED_FLUTTER_ARCH=$EXPECTED_FLUTTER_ARCH"
+
+            chmod +x ./scripts/build-linux.sh
+
+            ./scripts/build-linux.sh
+
+        # ============================================================
+        # 12. 验证生成的 Linux 包
+        #
+        # 这里不直接使用 matrix.flutter_arch 拼 build 路径，
+        # 而使用 Detect Linux architecture 产生的环境变量。
+        # ============================================================
+        - name: Verify Linux packages
+          shell: bash
+          run: |
+            set -euo pipefail
+
+            echo "========================================"
+            echo "Generated Linux packages"
+            echo "========================================"
+
+            find dist/linux -maxdepth 1 -type f -print
+
+            echo
+            echo "========================================"
+            echo "Expected architecture"
+            echo "========================================"
+
+            echo "MACHINE_ARCH=$MACHINE_ARCH"
+            echo "FLUTTER_ARCH=$FLUTTER_ARCH"
+            echo "DEB_ARCH=$DEB_ARCH"
+
+            case "$FLUTTER_ARCH" in
+              x64)
+                EXPECTED_ELF_PATTERN="x86-64"
+                ;;
+
+              arm64)
+                EXPECTED_ELF_PATTERN="ARM aarch64|aarch64"
+                ;;
+
+              *)
+                echo "Unsupported Flutter architecture: $FLUTTER_ARCH" >&2
+                exit 1
+                ;;
+            esac
+
+            # --------------------------------------------------------
+            # 验证 DEB
+            # --------------------------------------------------------
+            DEB_FILE="$(find dist/linux \
+              -maxdepth 1 \
+              -type f \
+              -name "log4app_*_${DEB_ARCH}.deb" \
+              -print \
+              -quit)"
+
+            if [ -z "$DEB_FILE" ]; then
+              echo "Expected DEB package was not generated." >&2
+              echo "Expected Debian architecture: $DEB_ARCH" >&2
+
+              echo
+              echo "dist/linux contains:"
+              find dist/linux -maxdepth 1 -type f -print >&2
+
+              exit 1
+            fi
+
+            echo
+            echo "========================================"
+            echo "DEB package"
+            echo "========================================"
+
+            echo "$DEB_FILE"
+
+            ACTUAL_DEB_ARCH="$(dpkg-deb -f "$DEB_FILE" Architecture)"
+
+            echo "Expected : $DEB_ARCH"
+            echo "Actual   : $ACTUAL_DEB_ARCH"
+
+            if [ "$ACTUAL_DEB_ARCH" != "$DEB_ARCH" ]; then
+              echo "DEB architecture mismatch." >&2
+              echo "Expected: $DEB_ARCH" >&2
+              echo "Actual:   $ACTUAL_DEB_ARCH" >&2
+              exit 1
+            fi
+
+            # --------------------------------------------------------
+            # 验证最终 ELF
+            # --------------------------------------------------------
+            BUNDLE_EXECUTABLE="build/linux/${FLUTTER_ARCH}/release/bundle/log4app"
+
+            echo
+            echo "========================================"
+            echo "Release executable"
+            echo "========================================"
+
+            echo "$BUNDLE_EXECUTABLE"
+
+            if [ ! -f "$BUNDLE_EXECUTABLE" ]; then
+              echo "Linux executable not found:" >&2
+              echo "$BUNDLE_EXECUTABLE" >&2
+
+              echo
+              echo "Available Linux executables:" >&2
+
+              find build/linux \
+                -maxdepth 6 \
+                -type f \
+                -name "log4app" \
+                -print >&2 || true
+
+              exit 1
+            fi
+
+            FILE_INFO="$(file "$BUNDLE_EXECUTABLE")"
+
+            echo "$FILE_INFO"
+
+            if ! echo "$FILE_INFO" | grep -Eq "$EXPECTED_ELF_PATTERN"; then
+              echo "Executable architecture mismatch." >&2
+              echo "Expected pattern: $EXPECTED_ELF_PATTERN" >&2
+              echo "Actual: $FILE_INFO" >&2
+              exit 1
+            fi
+
+            echo
+            echo "========================================"
+            echo "Linux package verification PASSED"
+            echo "========================================"
+            echo "Flutter architecture : $FLUTTER_ARCH"
+            echo "Debian architecture  : $DEB_ARCH"
+            echo "DEB                   : $DEB_FILE"
+            echo "Executable            : $BUNDLE_EXECUTABLE"
+
+        # ============================================================
+        # 13. 上传 Linux 安装包
+        # ============================================================
+        - name: Upload Linux packages
+          uses: actions/upload-artifact@v4
+          with:
+            name: ${{ matrix.artifact_name }}
+            path: dist/linux/*
+            if-no-files-found: error
+            retention-days: 14
 
   release:
     name: Publish GitHub Release
