@@ -60,11 +60,18 @@ suspend fun uploadLogs(
 http://192.168.31.52:9090
 ```
 
-## 3. Ping
+## 3. 设备 Ping
 
-```text
-GET http://192.168.31.52:9090/api/log/ping
+扫码取得 `baseUrl` 后，先发送设备 Ping，桌面端才会登记并显示设备：
+
+```http
+POST http://192.168.31.52:9090/api/device/ping
+Content-Type: application/json
+
+{"deviceId":"ROBOT_001","deviceName":"现场设备","appVersion":"1.0.0","platform":"Android","platformVersion":"14"}
 ```
+
+`deviceId` 必填。旧接口 `GET /api/log/ping` 仅用于连通性检查，不会登记设备。
 
 ## 4. Multipart 字段
 

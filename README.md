@@ -4,6 +4,8 @@
 
 Windows、macOS、Linux 跨平台局域网 App 日志收集工具。
 
+使用文档：[Log4App 使用说明](docs/LOG4APP_USER_GUIDE.md) · [业务流程图与 App 交互](docs/LOG4APP_FLOW.md)
+
 V2.1 服务端重点：
 
 - Flutter Desktop 单进程运行
