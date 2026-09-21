@@ -136,7 +136,8 @@ jobs:
           apt-get install --yes \
             binutils \
             ca-certificates \
-            clang \
+            clang-10 \
+            lld-10 \
             cmake \
             curl \
             file \
