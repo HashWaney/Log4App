@@ -218,3 +218,4 @@ jobs:
             gh release create "$GITHUB_REF_NAME" "${files[@]}" \
               --generate-notes \
               --title "Log4App $GITHUB_REF_NAME"
+          fi
