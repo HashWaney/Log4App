@@ -37,6 +37,32 @@ jobs:
         shell: pwsh
         run: choco install innosetup --yes --no-progress
 
+      - name: Install Simplified Chinese installer messages
+        shell: pwsh
+        run: |
+          $innoRoots = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6",
+            "$env:ProgramFiles\Inno Setup 6"
+          )
+          $innoRoot = $innoRoots |
+            Where-Object { Test-Path (Join-Path $_ "ISCC.exe") } |
+            Select-Object -First 1
+          if (-not $innoRoot) {
+            throw "Inno Setup 6 installation directory was not found."
+          }
+
+          $languageDir = Join-Path $innoRoot "Languages"
+          $languageFile = Join-Path $languageDir "ChineseSimplified.isl"
+          $translationUrl = "https://raw.githubusercontent.com/jrsoftware/issrc/c05512b1773ce81bf845c3d2e891f74452cf6f23/Files/Languages/ChineseSimplified.isl"
+          $expectedSha256 = "e0b0b350e2245f3c5e65586dfe43d574f6e7f06f2261149aba284954b3fc9a8d"
+
+          New-Item -ItemType Directory -Force -Path $languageDir | Out-Null
+          Invoke-WebRequest -Uri $translationUrl -OutFile $languageFile
+          $actualSha256 = (Get-FileHash -Algorithm SHA256 $languageFile).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne $expectedSha256) {
+            throw "ChineseSimplified.isl checksum mismatch: $actualSha256"
+          }
+
       - name: Build Windows packages
         shell: pwsh
         run: ./scripts/build-windows.ps1
