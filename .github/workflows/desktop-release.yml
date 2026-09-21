@@ -122,8 +122,18 @@ jobs:
           retention-days: 14
 
   build-linux:
-     name: Build Linux x64
-     runs-on: ubuntu-latest
+     name: Build Linux ${{ matrix.name }}
+     strategy:
+       fail-fast: false       
+       matrix:
+        include:
+          - name: x64
+            runner: ubuntu-24.04
+            flutter-arch: x64
+          - name: ARM64
+            runner: ubuntu-24.04-arm
+            flutter-arch: arm64
+     runs-on: ${{ matrix.runner }}
      container:
        image: ubuntu:20.04
        env:
@@ -201,6 +211,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+          architecture: ${{ matrix.flutter-arch }}
 
       - name: Trust Flutter SDK checkout in container
         run: git config --global --add safe.directory "$FLUTTER_ROOT"
@@ -211,12 +222,85 @@ jobs:
       - name: Build Linux packages
         env:
           MAX_GLIBC_VERSION: "2.31"
+          EXPECTED_FLUTTER_ARCH: ${{ matrix.flutter-arch }}
         run: ./scripts/build-linux.sh
+      - name: Verify Linux packages
+        shell: bash
+        run: |
+          set -euo pipefail
 
+          echo "========================================"
+          echo "Generated Linux packages"
+          echo "========================================"
+
+          find dist/linux -maxdepth 1 -type f -print
+
+          case "${{ matrix.flutter_arch }}" in
+            x64)
+              expected_deb_arch="amd64"
+              expected_elf_arch="x86-64"
+              ;;
+
+            arm64)
+              expected_deb_arch="arm64"
+              expected_elf_arch="ARM aarch64"
+              ;;
+
+            *)
+              echo "Unsupported Flutter architecture: ${{ matrix.flutter_arch }}" >&2
+              exit 1
+              ;;
+          esac
+
+          deb_file="$(find dist/linux -maxdepth 1 -type f \
+            -name "log4app_*_${expected_deb_arch}.deb" \
+            -print \
+            -quit)"
+
+          if [ -z "$deb_file" ]; then
+            echo "Expected DEB package for $expected_deb_arch was not generated." >&2
+            exit 1
+          fi
+
+          echo
+          echo "========================================"
+          echo "DEB package"
+          echo "========================================"
+          echo "$deb_file"
+
+          actual_deb_arch="$(dpkg-deb -f "$deb_file" Architecture)"
+          echo "Architecture: $actual_deb_arch"
+
+          if [ "$actual_deb_arch" != "$expected_deb_arch" ]; then
+            echo "DEB architecture mismatch." >&2
+            echo "Expected: $expected_deb_arch" >&2
+            echo "Actual:   $actual_deb_arch" >&2
+            exit 1
+          fi
+
+          echo
+          echo "========================================"
+          echo "Release executable"
+          echo "========================================"
+
+          bundle_executable="build/linux/${{ matrix.flutter_arch }}/release/bundle/log4app"
+
+          if [ ! -f "$bundle_executable" ]; then
+            echo "Linux executable not found: $bundle_executable" >&2
+            exit 1
+          fi
+
+          file "$bundle_executable"
+
+          if ! file "$bundle_executable" | grep -q "$expected_elf_arch"; then
+            echo "Executable architecture mismatch." >&2
+            echo "Expected architecture marker: $expected_elf_arch" >&2
+            exit 1
+          fi
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
         with:
-          name: log4app-linux-x64
+          name: log4app-linux-${{ matrix.flutter-arch }}
           path: dist/linux/*
           if-no-files-found: error
           retention-days: 14
