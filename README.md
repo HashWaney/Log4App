@@ -52,7 +52,7 @@ Ping 成功后桌面端会出现该设备。
 ## macOS 首次启动
 
 ```bash
-cd AndroidLogCenter-Flutter-V2.1
+cd Log4App
 ./scripts/bootstrap.sh
 flutter run -d macos
 ```
