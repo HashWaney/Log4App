@@ -121,10 +121,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-    build-linux:
-      name: Build Linux ${{ matrix.name }}
+  build-linux:
+    name: Build Linux ${{ matrix.name }}
 
-      strategy:
+    strategy:
         fail-fast: false
         matrix:
           include:
@@ -138,16 +138,16 @@ jobs:
               flutter_arch: arm64
               artifact_name: log4app-linux-arm64
 
-      runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
 
-      container:
+    container:
         image: ubuntu:20.04
         env:
           DEBIAN_FRONTEND: noninteractive
 
-      timeout-minutes: 60
+    timeout-minutes: 60
 
-      steps:
+    steps:
         # ============================================================
         # 1. 安装 Linux 编译依赖
         # ============================================================
