@@ -202,6 +202,7 @@ jobs:
               binutils \
               ca-certificates \
               clang \
+              llvm-10 \
               lld-10 \
               cmake \
               curl \
@@ -292,30 +293,34 @@ jobs:
             echo
             echo "=== clang ==="
             command -v clang
-            ls -l "$(command -v clang)"
             clang --version
 
             echo
             echo "=== clang++ ==="
             command -v clang++
-            ls -l "$(command -v clang++)"
             clang++ --version
 
             echo
-            echo "=== linker ==="
+            echo "=== ld.lld ==="
             test -x /usr/lib/llvm-10/bin/ld.lld
             /usr/lib/llvm-10/bin/ld.lld --version
 
             echo
-            echo "=== stdc++ ==="
-            ldconfig -p | grep libstdc++ || true
+            echo "=== llvm-ar ==="
+            test -x /usr/lib/llvm-10/bin/llvm-ar
+            /usr/lib/llvm-10/bin/llvm-ar --version
 
             echo
-            echo "=== cmake ==="
+            echo "=== llvm-ranlib ==="
+            test -x /usr/lib/llvm-10/bin/llvm-ranlib
+            /usr/lib/llvm-10/bin/llvm-ranlib --version
+
+            echo
+            echo "=== CMake ==="
             cmake --version
 
             echo
-            echo "=== ninja ==="
+            echo "=== Ninja ==="
             ninja --version
 
         # ============================================================
