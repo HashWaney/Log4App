@@ -14,7 +14,12 @@ import '../services/network_service.dart';
 import '../widgets/stat_card.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({
+    required this.serverVersion,
+    super.key,
+  });
+
+  final String serverVersion;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -36,7 +41,11 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _storage = LogStorageService();
-    _server = LogServer(storage: _storage, network: _network);
+    _server = LogServer(
+      storage: _storage,
+      network: _network,
+      serverVersion: widget.serverVersion,
+    );
     _bootstrap();
   }
 
@@ -186,7 +195,7 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.only(right: 8),
             child: Center(
               child: Text(
-                'V${LogServer.serverVersion}',
+                'V${_server.serverVersion}',
                 style: Theme.of(context).textTheme.labelMedium,
               ),
             ),

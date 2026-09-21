@@ -13,6 +13,7 @@ class LogServer {
   LogServer({
     required LogStorageService storage,
     required NetworkService network,
+    required this.serverVersion,
     this.port = 9090,
     this.maxUploadBytes = 500 * 1024 * 1024,
     this.onlineTimeout = const Duration(seconds: 90),
@@ -23,10 +24,10 @@ class LogServer {
   static const String serviceType = 'android-log-center';
   static const String serviceName = 'Log4App';
   static const int protocolVersion = 1;
-  static const String serverVersion = '2.1.0';
 
   final LogStorageService _storage;
   final NetworkService _network;
+  final String serverVersion;
   final int port;
   final int maxUploadBytes;
   final Duration onlineTimeout;
