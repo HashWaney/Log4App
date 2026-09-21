@@ -162,6 +162,9 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Trust Flutter SDK checkout in container
+        run: git config --global --add safe.directory "$FLUTTER_ROOT"
+
       - name: Build Linux packages
         env:
           MAX_GLIBC_VERSION: "2.31"

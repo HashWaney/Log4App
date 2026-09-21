@@ -1,7 +1,7 @@
 name: log4app
 description: Cross-platform LAN log collector for apps and devices.
 publish_to: 'none'
-version: 2.7.0+2
+version: 2.8.0+2
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
