@@ -46,6 +46,65 @@ if [ ! -x "$BUNDLE_DIR/log4app" ]; then
   exit 1
 fi
 
+version_is_greater() {
+  local candidate="$1"
+  local baseline="$2"
+  [ "$candidate" != "$baseline" ] &&
+    [ "$(printf '%s\n%s\n' "$candidate" "$baseline" | sort -V | tail -n 1)" = "$candidate" ]
+}
+
+verify_glibc_compatibility() {
+  local maximum_allowed="$1"
+  local candidate
+  local highest_required=""
+  local required
+  local incompatible=0
+
+  for command in file readelf; do
+    if ! command -v "$command" >/dev/null 2>&1; then
+      echo "Required command not found for GLIBC compatibility check: $command" >&2
+      exit 1
+    fi
+  done
+
+  while IFS= read -r -d '' candidate; do
+    if ! file -b "$candidate" | grep -q '^ELF'; then
+      continue
+    fi
+
+    required="$({ readelf --version-info "$candidate" 2>/dev/null || true; } \
+      | sed -n 's/.*Name: GLIBC_\([0-9][0-9.]*\).*/\1/p' \
+      | sort -Vu \
+      | tail -n 1)"
+    if [ -z "$required" ]; then
+      continue
+    fi
+
+    if [ -z "$highest_required" ] || version_is_greater "$required" "$highest_required"; then
+      highest_required="$required"
+    fi
+
+    if version_is_greater "$required" "$maximum_allowed"; then
+      echo "Incompatible GLIBC requirement: ${candidate#"$ROOT"/} requires GLIBC_$required (maximum allowed: GLIBC_$maximum_allowed)." >&2
+      incompatible=1
+    fi
+  done < <(find "$BUNDLE_DIR" -type f -print0)
+
+  if [ -z "$highest_required" ]; then
+    echo "Unable to determine the GLIBC requirement of the Linux bundle." >&2
+    exit 1
+  fi
+  if [ "$incompatible" -ne 0 ]; then
+    exit 1
+  fi
+
+  echo "GLIBC compatibility verified: bundle requires at most GLIBC_$highest_required (limit: GLIBC_$maximum_allowed)."
+}
+
+if [ -n "${MAX_GLIBC_VERSION:-}" ]; then
+  verify_glibc_compatibility "$MAX_GLIBC_VERSION"
+fi
+
 DIST_DIR="$ROOT/dist/linux"
 PACKAGE_ROOT="$ROOT/build/linux/package-root"
 APP_DIR="$PACKAGE_ROOT/opt/log4app"
