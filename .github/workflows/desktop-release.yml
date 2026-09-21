@@ -141,6 +141,7 @@ jobs:
             curl \
             file \
             git \
+            jq \
             libblkid-dev \
             libgtk-3-dev \
             liblzma-dev \
