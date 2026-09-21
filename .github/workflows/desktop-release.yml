@@ -122,21 +122,22 @@ jobs:
           retention-days: 14
 
   build-linux:
-    name: Build Linux x64
-    runs-on: ubuntu-latest
-    container:
-      image: ubuntu:20.04
-      env:
+     name: Build Linux x64
+     runs-on: ubuntu-latest
+     container:
+       image: ubuntu:20.04
+       env:
         DEBIAN_FRONTEND: noninteractive
-    timeout-minutes: 45
-    steps:
+     timeout-minutes: 45
+
+     steps:
       - name: Install Linux build dependencies
         run: |
           apt-get update
           apt-get install --yes \
             binutils \
             ca-certificates \
-            clang-10 \
+            clang \
             lld-10 \
             cmake \
             curl \
@@ -146,12 +147,50 @@ jobs:
             libblkid-dev \
             libgtk-3-dev \
             liblzma-dev \
+            libstdc++-9-dev \
             ninja-build \
             pkg-config \
             tar \
             unzip \
             xz-utils \
             zip
+
+      - name: Verify Linux toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "=== PATH ==="
+          echo "$PATH"
+
+          echo
+          echo "=== clang ==="
+          command -v clang
+          ls -l "$(command -v clang)"
+          clang --version
+
+          echo
+          echo "=== clang++ ==="
+          command -v clang++
+          ls -l "$(command -v clang++)"
+          clang++ --version
+
+          echo
+          echo "=== linker ==="
+          test -x /usr/lib/llvm-10/bin/ld.lld
+          /usr/lib/llvm-10/bin/ld.lld --version
+
+          echo
+          echo "=== stdc++ ==="
+          ldconfig -p | grep libstdc++ || true
+
+          echo
+          echo "=== cmake ==="
+          cmake --version
+
+          echo
+          echo "=== ninja ==="
+          ninja --version
 
       - name: Check out source
         uses: actions/checkout@v6
@@ -166,10 +205,11 @@ jobs:
       - name: Trust Flutter SDK checkout in container
         run: git config --global --add safe.directory "$FLUTTER_ROOT"
 
+      - name: Flutter doctor
+        run: flutter doctor -v
+
       - name: Build Linux packages
         env:
-          CC: clang-10
-          CXX: clang++-10
           MAX_GLIBC_VERSION: "2.31"
         run: ./scripts/build-linux.sh
 
