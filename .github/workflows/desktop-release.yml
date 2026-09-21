@@ -79,17 +79,53 @@ jobs:
     name: Build macOS ARM64
     runs-on: macos-15
     timeout-minutes: 45
+
     steps:
       - name: Check out source
         uses: actions/checkout@v6
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-          architecture: arm64
+      - name: Set up Flutter ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FLUTTER_DIR="$HOME/flutter"
+
+          rm -rf "$FLUTTER_DIR"
+
+          git clone \
+            --depth 1 \
+            --branch "${FLUTTER_VERSION}" \
+            https://github.com/flutter/flutter.git \
+            "$FLUTTER_DIR"
+
+          git config --global --add safe.directory "$FLUTTER_DIR"
+
+          echo "FLUTTER_ROOT=$FLUTTER_DIR" >> "$GITHUB_ENV"
+          echo "$FLUTTER_DIR/bin" >> "$GITHUB_PATH"
+          echo "$FLUTTER_DIR/bin/cache/dart-sdk/bin" >> "$GITHUB_PATH"
+
+          "$FLUTTER_DIR/bin/flutter" --version
+
+      - name: Verify Flutter environment
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "=== Architecture ==="
+          uname -m
+
+          echo
+          echo "=== Flutter ==="
+          flutter --version
+
+          echo
+          echo "=== Dart ==="
+          dart --version
+
+          echo
+          echo "=== Flutter doctor ==="
+          flutter doctor -v
 
       - name: Build macOS application
         run: ./scripts/build-macos.sh
@@ -98,14 +134,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="$(sed -n 's/^version:[[:space:]]*\([^+[:space:]]*\).*/\1/p' pubspec.yaml | head -n 1)"
+
+          version="$(sed -n 's/^version:[[:space:]]*\([^+[:space:]]*\).*/\1/p' pubspec.yaml | sed -n '1p')"
+
           app_path="build/macos/Build/Products/Release/Log4App.app"
           dmg_dir="dist/macos"
           dmg_path="$dmg_dir/Log4App-$version-macos-arm64.dmg"
 
           test -n "$version"
           test -d "$app_path"
+
           mkdir -p "$dmg_dir"
+
           hdiutil create \
             -volname "Log4App" \
             -srcfolder "$app_path" \
@@ -247,7 +287,7 @@ jobs:
 
             echo
             echo "=== GLIBC ==="
-            ldd --version | head -n 1
+            ldd --version 2>&1 | sed -n '1p'
 
             echo
             echo "=== clang ==="
