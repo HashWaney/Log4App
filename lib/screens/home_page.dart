@@ -33,6 +33,7 @@ class _HomePageState extends State<HomePage> {
   Timer? _timer;
   List<String> _addresses = const [];
   List<LogEntry> _logs = const [];
+  List<LogEntry> _videos = const [];
   List<ConnectedDevice> _devices = const [];
   String? _uiError;
   bool _busy = true;
@@ -66,10 +67,12 @@ class _HomePageState extends State<HomePage> {
     try {
       final addresses = await _network.getLanIpv4Addresses();
       final logs = await _storage.listLogs(limit: 50);
+      final videos = await _storage.listVideos(limit: 50);
       if (!mounted) return;
       setState(() {
         _addresses = addresses;
         _logs = logs;
+        _videos = videos;
         _devices = _server.devices;
         _uiError = null;
       });
@@ -85,6 +88,7 @@ class _HomePageState extends State<HomePage> {
       : 'http://$_primaryAddress:${_server.port}';
 
   String get _uploadUrl => '$_serverBaseUrl/api/log/upload';
+  String get _videoUploadUrl => '$_serverBaseUrl/api/video/upload';
 
   String? get _qrPayload {
     final address = _primaryAddress;
@@ -143,7 +147,18 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openLogFolder() async {
-    final path = _storage.rootDirectory.path;
+    await _openInSystem(_storage.rootDirectory.path, '日志目录');
+  }
+
+  Future<void> _openVideoFolder() async {
+    await _openInSystem(_storage.videoRootDirectory.path, '录屏目录');
+  }
+
+  Future<void> _openVideo(String path) async {
+    await _openInSystem(path, '录屏文件');
+  }
+
+  Future<void> _openInSystem(String path, String label) async {
     try {
       ProcessResult? result;
       if (Platform.isMacOS) {
@@ -155,13 +170,13 @@ class _HomePageState extends State<HomePage> {
       }
 
       if (result != null && result.exitCode != 0) {
-        throw FileSystemException('无法打开日志目录', path);
+        throw FileSystemException('无法打开$label', path);
       }
     } catch (e) {
       await Clipboard.setData(ClipboardData(text: path));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('无法自动打开目录，路径已复制：$path')),
+        SnackBar(content: Text('无法自动打开$label，路径已复制：$path')),
       );
     }
   }
@@ -208,7 +223,7 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(width: 8),
         ],
       ),
-      body: _busy && _logs.isEmpty
+      body: _busy && _logs.isEmpty && _videos.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : SelectionArea(
               child: SingleChildScrollView(
@@ -262,6 +277,8 @@ class _HomePageState extends State<HomePage> {
                         ],
                         const SizedBox(height: 18),
                         _buildDevicesCard(),
+                        const SizedBox(height: 18),
+                        _buildVideosCard(),
                         const SizedBox(height: 18),
                         _buildLogsCard(),
                       ],
@@ -335,7 +352,11 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 10),
             _InfoLine(label: 'App 上传', value: _uploadUrl),
             const SizedBox(height: 10),
+            _InfoLine(label: '录屏上传', value: _videoUploadUrl),
+            const SizedBox(height: 10),
             _InfoLine(label: '日志目录', value: _storage.rootDirectory.path),
+            const SizedBox(height: 10),
+            _InfoLine(label: '录屏目录', value: _storage.videoRootDirectory.path),
             if (_addresses.length > 1) ...[
               const SizedBox(height: 10),
               _InfoLine(
@@ -359,6 +380,11 @@ class _HomePageState extends State<HomePage> {
                   onPressed: _openLogFolder,
                   icon: const Icon(Icons.folder_open),
                   label: const Text('打开日志目录'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _openVideoFolder,
+                  icon: const Icon(Icons.video_library_outlined),
+                  label: const Text('打开录屏目录'),
                 ),
               ],
             ),
@@ -544,6 +570,55 @@ class _HomePageState extends State<HomePage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   trailing: Text(_formatBytes(item.sizeBytes)),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideosCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('最近录屏反馈', style: Theme.of(context).textTheme.titleLarge),
+                const Spacer(),
+                Flexible(
+                  child: Text(
+                    '本次 ${_server.totalVideoUploads} 个 / '
+                    '${_formatBytes(_server.totalVideoBytes)} · '
+                    '本地最近 ${_videos.length} 个',
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (_videos.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 28),
+                child: Center(child: Text('还没有收到录屏反馈')),
+              )
+            else
+              ..._videos.map(
+                (item) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.play_circle_outline),
+                  title: Text(item.fileName),
+                  subtitle: Text(
+                    '${item.deviceId}  ·  ${item.appVersion}  ·  '
+                    '${_formatDateTime(item.uploadedAt)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Text(_formatBytes(item.sizeBytes)),
+                  onTap: () => _openVideo(item.path),
                 ),
               ),
           ],

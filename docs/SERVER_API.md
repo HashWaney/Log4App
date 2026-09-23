@@ -152,7 +152,33 @@ Content-Type：`application/json`
 
 ---
 
-## 8. curl 验证
+## 8. POST /api/video/upload
+
+录屏反馈专用接口，使用 `multipart/form-data`。它与 `/api/log/upload` 独立，新增本接口不会改变原日志上传接口的字段、响应或存储目录。
+
+字段：
+
+| 字段 | 必填 | 含义 |
+|---|---:|---|
+| `deviceId` | 是 | 稳定设备标识 |
+| `deviceName` | 否 | 设备显示名称 |
+| `appVersion` | 否 | 采集端 App 版本 |
+| `platform` | 否 | 平台名称，如 Android |
+| `platformVersion` | 否 | 平台或系统版本 |
+| `androidVersion` | 否 | 旧 Android 客户端兼容字段 |
+| `file` | 是 | 扩展名为 `.mp4` 的录屏文件 |
+
+最大上传大小默认仍为 500 MB。视频保存在独立的 `Log4AppVideos` 目录，成功响应额外包含 `"artifactType": "screen_recording"`。
+
+---
+
+## 9. GET /api/video/list
+
+返回电脑端最近收到的录屏反馈，不混入 `/api/log/list`。
+
+---
+
+## 10. curl 验证
 
 ### Server info
 
@@ -180,4 +206,17 @@ curl -X POST \
   -F 'platformVersion=14' \
   -F 'file=@./test.zip' \
   http://127.0.0.1:9090/api/log/upload
+```
+
+### 模拟录屏反馈上传
+
+```bash
+curl -X POST \
+  -F 'deviceId=TEST_001' \
+  -F 'deviceName=Test Device' \
+  -F 'appVersion=1.0.0' \
+  -F 'platform=Android' \
+  -F 'platformVersion=14' \
+  -F 'file=@./screen_recording.mp4;type=video/mp4' \
+  http://127.0.0.1:9090/api/video/upload
 ```

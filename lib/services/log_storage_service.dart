@@ -6,15 +6,25 @@ import 'package:path_provider/path_provider.dart';
 import '../models/log_entry.dart';
 
 class LogStorageService {
-  LogStorageService({Directory? rootDirectory})
-      : _rootDirectory = rootDirectory;
+  LogStorageService({Directory? rootDirectory, Directory? videoRootDirectory})
+      : _rootDirectory = rootDirectory,
+        _videoRootDirectory = videoRootDirectory;
 
   Directory? _rootDirectory;
+  Directory? _videoRootDirectory;
 
   Directory get rootDirectory {
     final value = _rootDirectory;
     if (value == null) {
       throw StateError('Log storage has not been initialized yet.');
+    }
+    return value;
+  }
+
+  Directory get videoRootDirectory {
+    final value = _videoRootDirectory;
+    if (value == null) {
+      throw StateError('Video storage has not been initialized yet.');
     }
     return value;
   }
@@ -35,7 +45,11 @@ class LogStorageService {
       }
       _rootDirectory ??= preferred;
     }
+    _videoRootDirectory ??= Directory(
+      p.join(_rootDirectory!.parent.path, 'Log4AppVideos'),
+    );
     await _rootDirectory!.create(recursive: true);
+    await _videoRootDirectory!.create(recursive: true);
   }
 
   Future<LogEntry> storeTempUpload({
@@ -46,16 +60,56 @@ class LogStorageService {
     required int sizeBytes,
   }) async {
     await ensureReady();
+    return _storeTempUpload(
+      root: rootDirectory,
+      tempFile: tempFile,
+      deviceId: deviceId,
+      appVersion: appVersion,
+      originalFileName: originalFileName,
+      sizeBytes: sizeBytes,
+      defaultFileName: 'logs.zip',
+    );
+  }
+
+  Future<LogEntry> storeTempVideoUpload({
+    required File tempFile,
+    required String deviceId,
+    required String appVersion,
+    required String originalFileName,
+    required int sizeBytes,
+  }) async {
+    await ensureReady();
+    return _storeTempUpload(
+      root: videoRootDirectory,
+      tempFile: tempFile,
+      deviceId: deviceId,
+      appVersion: appVersion,
+      originalFileName: originalFileName,
+      sizeBytes: sizeBytes,
+      defaultFileName: 'screen_recording.mp4',
+    );
+  }
+
+  Future<LogEntry> _storeTempUpload({
+    required Directory root,
+    required File tempFile,
+    required String deviceId,
+    required String appVersion,
+    required String originalFileName,
+    required int sizeBytes,
+    required String defaultFileName,
+  }) async {
+    await ensureReady();
 
     final now = DateTime.now();
     final safeDevice =
         _sanitize(deviceId.isEmpty ? 'unknown-device' : deviceId);
     final safeVersion = _sanitize(appVersion.isEmpty ? 'unknown' : appVersion);
     final safeOriginal = _sanitizeFileName(
-      originalFileName.isEmpty ? 'logs.zip' : originalFileName,
+      originalFileName.isEmpty ? defaultFileName : originalFileName,
     );
     final day = _yyyyMmDd(now);
-    final dir = Directory(p.join(rootDirectory.path, safeDevice, day));
+    final dir = Directory(p.join(root.path, safeDevice, day));
     await dir.create(recursive: true);
 
     final timestamp = _timestamp(now);
@@ -84,12 +138,24 @@ class LogStorageService {
 
   Future<List<LogEntry>> listLogs({int limit = 100}) async {
     await ensureReady();
+    return _listEntries(rootDirectory, limit: limit);
+  }
+
+  Future<List<LogEntry>> listVideos({int limit = 100}) async {
+    await ensureReady();
+    return _listEntries(videoRootDirectory, limit: limit);
+  }
+
+  Future<List<LogEntry>> _listEntries(
+    Directory root, {
+    required int limit,
+  }) async {
     final result = <LogEntry>[];
 
-    await for (final entity in rootDirectory.list(recursive: true)) {
+    await for (final entity in root.list(recursive: true)) {
       if (entity is! File) continue;
       final stat = await entity.stat();
-      final relative = p.relative(entity.path, from: rootDirectory.path);
+      final relative = p.relative(entity.path, from: root.path);
       final parts = p.split(relative);
       final deviceId = parts.isNotEmpty ? parts.first : 'unknown-device';
       result.add(

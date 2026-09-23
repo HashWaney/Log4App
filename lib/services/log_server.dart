@@ -39,8 +39,11 @@ class LogServer {
   bool get isRunning => _server != null;
   int totalUploads = 0;
   int totalBytes = 0;
+  int totalVideoUploads = 0;
+  int totalVideoBytes = 0;
   String? lastError;
   LogEntry? lastUpload;
+  LogEntry? lastVideoUpload;
 
   List<ConnectedDevice> get devices {
     final items = _devices.values.toList()
@@ -135,8 +138,22 @@ class LogServer {
         return;
       }
 
+      if (request.method == 'GET' && request.uri.path == '/api/video/list') {
+        final videos = await _storage.listVideos();
+        await _json(request.response, HttpStatus.ok, {
+          'success': true,
+          'items': videos.map((e) => e.toJson()).toList(),
+        });
+        return;
+      }
+
       if (request.method == 'POST' && request.uri.path == '/api/log/upload') {
         await _handleUpload(request);
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/video/upload') {
+        await _handleVideoUpload(request);
         return;
       }
 
@@ -254,10 +271,23 @@ class LogServer {
     await _handleRawUpload(request);
   }
 
+  Future<void> _handleVideoUpload(HttpRequest request) async {
+    final contentType = request.headers.contentType;
+    if (contentType?.mimeType != 'multipart/form-data') {
+      await _json(request.response, HttpStatus.unsupportedMediaType, {
+        'success': false,
+        'message': 'Video upload requires multipart/form-data',
+      });
+      return;
+    }
+    await _handleMultipartUpload(request, contentType!, isVideo: true);
+  }
+
   Future<void> _handleMultipartUpload(
     HttpRequest request,
-    ContentType contentType,
-  ) async {
+    ContentType contentType, {
+    bool isVideo = false,
+  }) async {
     final boundary = contentType.parameters['boundary'];
     if (boundary == null || boundary.isEmpty) {
       await _json(request.response, HttpStatus.badRequest, {
@@ -273,7 +303,7 @@ class LogServer {
     String platform = '';
     String platformVersion = '';
     String legacyAndroidVersion = '';
-    String originalFileName = 'logs.zip';
+    String originalFileName = isVideo ? 'screen_recording.mp4' : 'logs.zip';
     File? tempFile;
     int fileBytes = 0;
 
@@ -336,13 +366,30 @@ class LogServer {
       return;
     }
 
-    final entry = await _storage.storeTempUpload(
-      tempFile: tempFile,
-      deviceId: deviceId,
-      appVersion: appVersion,
-      originalFileName: originalFileName,
-      sizeBytes: fileBytes,
-    );
+    if (isVideo && !originalFileName.toLowerCase().endsWith('.mp4')) {
+      await _safeDelete(tempFile);
+      await _json(request.response, HttpStatus.unsupportedMediaType, {
+        'success': false,
+        'message': 'Only MP4 screen recordings are supported',
+      });
+      return;
+    }
+
+    final entry = isVideo
+        ? await _storage.storeTempVideoUpload(
+            tempFile: tempFile,
+            deviceId: deviceId,
+            appVersion: appVersion,
+            originalFileName: originalFileName,
+            sizeBytes: fileBytes,
+          )
+        : await _storage.storeTempUpload(
+            tempFile: tempFile,
+            deviceId: deviceId,
+            appVersion: appVersion,
+            originalFileName: originalFileName,
+            sizeBytes: fileBytes,
+          );
     _recordUpload(
       entry,
       deviceName: deviceName,
@@ -351,12 +398,17 @@ class LogServer {
           : platform,
       platformVersion:
           platformVersion.isEmpty ? legacyAndroidVersion : platformVersion,
+      isVideo: isVideo,
     );
 
-    await _json(request.response, HttpStatus.ok, {
+    final responseBody = <String, Object>{
       'success': true,
       'item': entry.toJson(),
-    });
+    };
+    if (isVideo) {
+      responseBody['artifactType'] = 'screen_recording';
+    }
+    await _json(request.response, HttpStatus.ok, responseBody);
   }
 
   Future<void> _handleRawUpload(HttpRequest request) async {
@@ -466,10 +518,17 @@ class LogServer {
     String deviceName = '',
     String platform = '',
     String platformVersion = '',
+    bool isVideo = false,
   }) {
-    totalUploads += 1;
-    totalBytes += entry.sizeBytes;
-    lastUpload = entry;
+    if (isVideo) {
+      totalVideoUploads += 1;
+      totalVideoBytes += entry.sizeBytes;
+      lastVideoUpload = entry;
+    } else {
+      totalUploads += 1;
+      totalBytes += entry.sizeBytes;
+      lastUpload = entry;
+    }
     lastError = null;
 
     _touchDevice(

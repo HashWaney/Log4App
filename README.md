@@ -16,6 +16,7 @@ V2.1 服务端重点：
 - 采集端 App `POST /api/device/ping` 后桌面登记并显示设备。
 - 设备 90 秒内有通信显示“已连接”。
 - App 日志 Multipart 上传。
+- MP4 录屏反馈使用独立接口上传并单独存储。
 - 最大上传包默认 500 MB。
 - 上传后显示设备最后上传时间/大小。
 - 最近日志列表。
@@ -215,6 +216,8 @@ Log4AppLogs/
 
 桌面程序提供“打开日志目录”按钮。
 
+录屏反馈保存在同级的 `Log4AppVideos` 目录，桌面程序提供“打开录屏目录”按钮；日志目录和旧日志接口保持不变。
+
 ## 主要 API
 
 ```text
@@ -224,6 +227,8 @@ POST /api/device/ping
 GET  /api/device/list
 POST /api/log/upload
 GET  /api/log/list
+POST /api/video/upload
+GET  /api/video/list
 ```
 
 ## 依赖
