@@ -49,19 +49,6 @@ def display_result(value: str) -> str:
 
 
 def main() -> None:
-    event_name = env("EVENT_NAME")
-    final_notification = env("FINAL_NOTIFICATION").lower() == "true"
-
-    # push 触发的构建会在后续 SMB 发布工作流完成后统一通知，
-    # 避免出现“CI 成功”但 SMB 上传随后失败的误导性消息。
-    # PR / workflow_dispatch 仍由原 Desktop CI 工作流直接通知。
-    if event_name == "push" and not final_notification:
-        print(
-            "Push DingTalk notification is deferred until the SMB "
-            "publish workflow completes."
-        )
-        return
-
     webhook = env("DINGTALK_WEBHOOK")
 
     if not webhook:
@@ -72,29 +59,30 @@ def main() -> None:
         return
 
     is_release = env("IS_RELEASE").lower() == "true"
-    smb_required = env("SMB_REQUIRED").lower() == "true"
 
-    # 兼容原 Desktop CI：旧工作流只提供 LINUX_RESULT。
-    # 新的 SMB 发布工作流会分别提供两个 Linux 架构结果。
+    # build-linux 是 matrix job：
+    #
+    #   Linux x64
+    #   Linux ARM64
+    #
+    # GitHub Actions 的 needs.build-linux.result
+    # 表示整个 matrix job 的最终结果。
+    #
+    # 因此当前 Linux 两个架构共用 LINUX_RESULT。
     linux_result = env("LINUX_RESULT", "unknown")
-    linux_x64_result = env("LINUX_X64_RESULT", linux_result)
-    linux_arm64_result = env("LINUX_ARM64_RESULT", linux_result)
 
     results = {
         "Windows x64": env("WINDOWS_RESULT", "unknown"),
         "macOS ARM64": env("MACOS_RESULT", "unknown"),
-        "Linux x64": linux_x64_result,
-        "Linux ARM64": linux_arm64_result,
+        "Linux x64": linux_result,
+        "Linux ARM64": linux_result,
+        "GitHub Release": env("RELEASE_RESULT", "unknown"),
     }
 
-    smb_result = env("SMB_RESULT")
-    if smb_result:
-        results["SMB 发布"] = smb_result
-
-    release_result = env("RELEASE_RESULT")
-    if release_result:
-        results["GitHub Release"] = release_result
-
+    # 三个平台 / 四个架构始终参与 CI 成败判断。
+    #
+    # Linux x64 / ARM64 当前来自同一个 matrix job，
+    # 所以这里直接使用两个展示项即可。
     required_results = [
         results["Windows x64"],
         results["macOS ARM64"],
@@ -102,15 +90,10 @@ def main() -> None:
         results["Linux ARM64"],
     ]
 
-    if smb_required:
-        required_results.append(
-            results.get("SMB 发布", "unknown")
-        )
-
     # 只有正式 Tag Release 时才要求 GitHub Release 成功。
     if is_release:
         required_results.append(
-            results.get("GitHub Release", "unknown")
+            results["GitHub Release"]
         )
 
     succeeded = all(
@@ -124,6 +107,7 @@ def main() -> None:
     title = f"{status_icon} Log4App CI {status_text}"
 
     repository = env("REPOSITORY")
+    event_name = env("EVENT_NAME")
     ref_name = env("REF_NAME")
     commit_sha = env("COMMIT_SHA")
     actor = env("ACTOR")
@@ -137,6 +121,9 @@ def main() -> None:
         for name, result in results.items()
     )
 
+    # ------------------------------------------------------------
+    # 链接区域
+    # ------------------------------------------------------------
     link_lines = []
 
     if run_url:
@@ -144,6 +131,7 @@ def main() -> None:
             f"[🔍 查看 GitHub Actions 运行详情]({run_url})"
         )
 
+    # 只有正式 Tag Release 才显示安装包下载地址。
     if is_release and release_url:
         link_lines.append("")
         link_lines.append(
@@ -158,7 +146,7 @@ def main() -> None:
         f"- 提交：`{short_sha}`",
         f"- 操作者：{actor}",
         "",
-        "### 🛠️ 构建与发布结果",
+        "### 🛠️ 构建结果",
         "",
         result_lines,
     ]
