@@ -1,4 +1,4 @@
-# Log4App — Flutter Desktop V2.1
+# Log4App
 
 ![图](image.png)
 
