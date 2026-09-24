@@ -741,9 +741,9 @@ jobs:
           set -euo pipefail
 
           chmod +x \
-            ./scripts/publish-smb.sh
+            ./.github/scripts/publish-smb.sh
 
-          ./scripts/publish-smb.sh
+          ./.github/scripts/publish-smb.sh
 
 
   # ==========================================================
