@@ -1128,10 +1128,10 @@ jobs:
         env:
 
           SMB_SERVER:
-            ${{ secrets.SMB_SERVER }}
+            ${{ vars.SMB_SERVER }}
 
           SMB_SHARE:
-            ${{ secrets.SMB_SHARE }}
+            ${{ vars.SMB_SHARE }}
 
           SMB_USER:
             ${{ secrets.SMB_USER }}
@@ -1180,10 +1180,10 @@ jobs:
         env:
 
           NEXUS_URL:
-            ${{ secrets.NEXUS_URL }}
+            ${{ vars.NEXUS_URL }}
 
           NEXUS_REPO:
-            ${{ secrets.NEXUS_REPO }}
+            ${{ vars.NEXUS_REPO }}
 
           NEXUS_USER:
             ${{ secrets.NEXUS_USER }}
