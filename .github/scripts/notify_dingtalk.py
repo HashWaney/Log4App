@@ -28,6 +28,7 @@ def signed_webhook(webhook: str, secret: str) -> str:
     ).digest()
 
     sign = base64.b64encode(digest).decode("utf-8")
+
     separator = "&" if "?" in webhook else "?"
 
     return (
@@ -45,40 +46,42 @@ def display_result(value: str) -> str:
         "unknown": "❔ 未知",
     }
 
-    return labels.get(value, value or "未知")
+    return labels.get(value, value or "❔ 未知")
 
 
 def main() -> None:
     event_name = env("EVENT_NAME")
     final_notification = env("FINAL_NOTIFICATION").lower() == "true"
 
-    # push 触发的构建会在后续 SMB 发布工作流完成后统一通知，
-    # 避免出现“CI 成功”但 SMB 上传随后失败的误导性消息。
-    # PR / workflow_dispatch 仍由原 Desktop CI 工作流直接通知。
     if event_name == "push" and not final_notification:
         print(
-            "Push DingTalk notification is deferred until the SMB "
-            "publish workflow completes."
+            "Push DingTalk notification is deferred until "
+            "the publish workflow completes."
         )
         return
 
     webhook = env("DINGTALK_WEBHOOK")
 
     if not webhook:
-        print(
-            "DINGTALK_WEBHOOK is not configured; "
-            "skipping DingTalk notification."
-        )
+        print("DINGTALK_WEBHOOK is not configured.")
         return
 
     is_release = env("IS_RELEASE").lower() == "true"
-    smb_required = env("SMB_REQUIRED").lower() == "true"
 
-    # 兼容原 Desktop CI：旧工作流只提供 LINUX_RESULT。
-    # 新的 SMB 发布工作流会分别提供两个 Linux 架构结果。
+    smb_required = env("SMB_REQUIRED").lower() == "true"
+    nexus_required = env("NEXUS_REQUIRED").lower() == "true"
+
     linux_result = env("LINUX_RESULT", "unknown")
-    linux_x64_result = env("LINUX_X64_RESULT", linux_result)
-    linux_arm64_result = env("LINUX_ARM64_RESULT", linux_result)
+
+    linux_x64_result = env(
+        "LINUX_X64_RESULT",
+        linux_result,
+    )
+
+    linux_arm64_result = env(
+        "LINUX_ARM64_RESULT",
+        linux_result,
+    )
 
     results = {
         "Windows x64": env("WINDOWS_RESULT", "unknown"),
@@ -87,11 +90,26 @@ def main() -> None:
         "Linux ARM64": linux_arm64_result,
     }
 
+    publish_job_result = env("PUBLISH_JOB_RESULT", "unknown")
+
     smb_result = env("SMB_RESULT")
-    if smb_result:
+
+    if not smb_result:
+        smb_result = publish_job_result
+
+    nexus_result = env("NEXUS_RESULT")
+
+    if not nexus_result:
+        nexus_result = "unknown"
+
+    if smb_required:
         results["SMB 发布"] = smb_result
 
+    if nexus_required:
+        results["Nexus 发布"] = nexus_result
+
     release_result = env("RELEASE_RESULT")
+
     if release_result:
         results["GitHub Release"] = release_result
 
@@ -103,11 +121,11 @@ def main() -> None:
     ]
 
     if smb_required:
-        required_results.append(
-            results.get("SMB 发布", "unknown")
-        )
+        required_results.append(smb_result)
 
-    # 只有正式 Tag Release 时才要求 GitHub Release 成功。
+    if nexus_required:
+        required_results.append(nexus_result)
+
     if is_release:
         required_results.append(
             results.get("GitHub Release", "unknown")
@@ -121,14 +139,22 @@ def main() -> None:
     status_text = "成功" if succeeded else "失败"
     status_icon = "✅" if succeeded else "❌"
 
-    title = f"{status_icon} Log4App CI {status_text}"
+    title = f"{status_icon} Log4App 发布{status_text}"
 
     repository = env("REPOSITORY")
     ref_name = env("REF_NAME")
     commit_sha = env("COMMIT_SHA")
     actor = env("ACTOR")
+
+    publish_version = env("PUBLISH_VERSION")
+
     run_url = env("RUN_URL")
     release_url = env("RELEASE_URL")
+
+    smb_directory = env("SMB_DIRECTORY")
+
+    nexus_root_url = env("NEXUS_ROOT_URL")
+    nexus_package_markdown = env("NEXUS_PACKAGE_MARKDOWN")
 
     short_sha = commit_sha[:7]
 
@@ -136,6 +162,59 @@ def main() -> None:
         f"- {name}：{display_result(result)}"
         for name, result in results.items()
     )
+
+    markdown_lines = [
+        f"### {title}",
+        "",
+        f"- 仓库：{repository}",
+    ]
+
+    if publish_version:
+        markdown_lines.append(
+            f"- 版本：`{publish_version}`"
+        )
+
+    markdown_lines.extend(
+        [
+            f"- 触发：{event_name} / {ref_name}",
+            f"- 提交：`{short_sha}`",
+            f"- 操作者：{actor}",
+            "",
+            "### 🛠️ 构建与发布结果",
+            "",
+            result_lines,
+        ]
+    )
+
+    if smb_directory or nexus_root_url:
+        markdown_lines.extend(
+            [
+                "",
+                "### 📍 发布位置",
+                "",
+            ]
+        )
+
+    if smb_directory:
+        markdown_lines.append(
+            f"- SMB：`{smb_directory}`"
+        )
+
+    if nexus_root_url:
+        markdown_lines.append(
+            f"- [Nexus {publish_version or '版本'} 目录]"
+            f"({nexus_root_url})"
+        )
+
+    if nexus_package_markdown:
+        markdown_lines.extend(
+            [
+                "",
+                "### 📦 各平台安装包",
+                "",
+                nexus_package_markdown,
+            ]
+        )
 
     link_lines = []
 
@@ -145,23 +224,9 @@ def main() -> None:
         )
 
     if is_release and release_url:
-        link_lines.append("")
         link_lines.append(
-            f"[📦 下载 {ref_name} Release 安装包]({release_url})"
+            f"[📦 GitHub Release 安装包]({release_url})"
         )
-
-    markdown_lines = [
-        f"### {title}",
-        "",
-        f"- 仓库：{repository}",
-        f"- 触发：{event_name} / {ref_name}",
-        f"- 提交：`{short_sha}`",
-        f"- 操作者：{actor}",
-        "",
-        "### 🛠️ 构建与发布结果",
-        "",
-        result_lines,
-    ]
 
     if link_lines:
         markdown_lines.extend(
@@ -193,7 +258,8 @@ def main() -> None:
             ensure_ascii=False,
         ).encode("utf-8"),
         headers={
-            "Content-Type": "application/json; charset=utf-8",
+            "Content-Type":
+                "application/json; charset=utf-8",
         },
         method="POST",
     )
