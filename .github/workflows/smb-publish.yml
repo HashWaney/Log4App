@@ -276,7 +276,7 @@ jobs:
       - X64
 
 
-    timeout-minutes: 30
+    timeout-minutes: 90
 
 
     steps:
