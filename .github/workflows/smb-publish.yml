@@ -1,28 +1,22 @@
 name: Publish Desktop Artifacts to SMB
 
-
 on:
   workflow_run:
     workflows:
       - Desktop CI and Release
-
     types:
       - completed
-
 
 permissions:
   actions: read
   contents: read
-
 
 jobs:
 
   # ==========================================================
   # 获取上游 Desktop CI 各 Job 结果
   # ==========================================================
-
   collect-results:
-
     name: Collect desktop CI results
 
     if: >-
@@ -31,81 +25,49 @@ jobs:
 
     runs-on: ubuntu-latest
 
-
     outputs:
-
-      windows_result:
-        ${{ steps.results.outputs.windows_result }}
-
-      macos_result:
-        ${{ steps.results.outputs.macos_result }}
-
-      linux_x64_result:
-        ${{ steps.results.outputs.linux_x64_result }}
-
-      linux_arm64_result:
-        ${{ steps.results.outputs.linux_arm64_result }}
-
-      release_result:
-        ${{ steps.results.outputs.release_result }}
-
-      builds_succeeded:
-        ${{ steps.results.outputs.builds_succeeded }}
-
-      is_release:
-        ${{ steps.results.outputs.is_release }}
-
-      ref_name:
-        ${{ steps.results.outputs.ref_name }}
-
+      windows_result: ${{ steps.results.outputs.windows_result }}
+      macos_result: ${{ steps.results.outputs.macos_result }}
+      linux_x64_result: ${{ steps.results.outputs.linux_x64_result }}
+      linux_arm64_result: ${{ steps.results.outputs.linux_arm64_result }}
+      release_result: ${{ steps.results.outputs.release_result }}
+      builds_succeeded: ${{ steps.results.outputs.builds_succeeded }}
+      is_release: ${{ steps.results.outputs.is_release }}
+      ref_name: ${{ steps.results.outputs.ref_name }}
 
     steps:
 
       - name: Read upstream job results
-
         id: results
-
         shell: bash
 
         env:
-
           GH_TOKEN: ${{ github.token }}
-
-          UPSTREAM_RUN_ID:
-            ${{ github.event.workflow_run.id }}
-
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
 
         run: |
-
           set -euo pipefail
-
 
           # ----------------------------------------------------
           # 获取上游 workflow
           # ----------------------------------------------------
-
           run_json="$(
             gh api \
               "repos/${GITHUB_REPOSITORY}/actions/runs/${UPSTREAM_RUN_ID}"
           )"
 
-
           # ----------------------------------------------------
           # 获取上游所有 Job
           # ----------------------------------------------------
-
           jobs_json="$(
             gh api \
               "repos/${GITHUB_REPOSITORY}/actions/runs/${UPSTREAM_RUN_ID}/jobs?per_page=100"
           )"
 
-
           # ----------------------------------------------------
           # 查询 Job 结果
           # ----------------------------------------------------
-
           job_result() {
-
             local job_name="$1"
 
             echo "$jobs_json" |
@@ -126,53 +88,42 @@ jobs:
               '
           }
 
-
           windows_result="$(
             job_result "Build Windows x64"
           )"
-
 
           macos_result="$(
             job_result "Build macOS ARM64"
           )"
 
-
           linux_x64_result="$(
             job_result "Build Linux x64"
           )"
-
 
           linux_arm64_result="$(
             job_result "Build Linux ARM64"
           )"
 
-
           release_result="$(
             job_result "Publish GitHub Release"
           )"
 
-
           # ----------------------------------------------------
           # Ref
           # ----------------------------------------------------
-
           ref_name="$(
             echo "$run_json" |
             jq -r '.head_branch // ""'
           )"
 
-
           if [ -z "$ref_name" ]; then
             ref_name="unknown"
           fi
 
-
           # ----------------------------------------------------
           # 四个平台是否全部成功
           # ----------------------------------------------------
-
           builds_succeeded="false"
-
 
           if \
             [ "$windows_result" = "success" ] && \
@@ -180,28 +131,20 @@ jobs:
             [ "$linux_x64_result" = "success" ] && \
             [ "$linux_arm64_result" = "success" ]
           then
-
             builds_succeeded="true"
-
           fi
-
 
           # ----------------------------------------------------
           # 是否为 Release
           # ----------------------------------------------------
-
           is_release="false"
-
 
           if \
             [ "$release_result" != "skipped" ] && \
             [ "$release_result" != "unknown" ]
           then
-
             is_release="true"
-
           fi
-
 
           echo
           echo "========================================"
@@ -216,104 +159,56 @@ jobs:
           echo "Ref            : $ref_name"
           echo "Release        : $is_release"
 
-
           {
             echo "windows_result=$windows_result"
-
             echo "macos_result=$macos_result"
-
             echo "linux_x64_result=$linux_x64_result"
-
             echo "linux_arm64_result=$linux_arm64_result"
-
             echo "release_result=$release_result"
-
             echo "builds_succeeded=$builds_succeeded"
-
             echo "is_release=$is_release"
-
             echo "ref_name=$ref_name"
-
           } >> "$GITHUB_OUTPUT"
 
 
   # ==========================================================
   # SMB 发布
   # ==========================================================
-
   publish-smb:
-
     name: Publish packages to SMB
 
     needs:
       - collect-results
 
-
     if: >-
       needs.collect-results.outputs.builds_succeeded == 'true'
-
-
-    # ========================================================
-    # 当前实际 Runner：
-    #
-    # actions-runner-linux-x64
-    #
-    # 不再使用：
-    #
-    # macOS
-    # ARM64
-    #
-    # 如果以后给 Runner 添加 smb label，
-    # 可以在下面再增加：
-    #
-    # - smb
-    #
-    # ========================================================
 
     runs-on:
       - self-hosted
       - Linux
       - X64
 
-
+    # 四个平台下载 + 网络重试 + SMB 上传的总兜底时间
     timeout-minutes: 90
-
 
     steps:
 
       # ======================================================
       # 必须 checkout 上游构建时对应的 Commit
-      #
-      # 防止：
-      #
-      # 构建版本 = 2.10.4
-      # main 已更新 = 2.10.5
-      #
-      # 导致安装包错误上传到 v2.10.5。
       # ======================================================
-
       - name: Check out upstream commit
-
         uses: actions/checkout@v6
-
         with:
-
-          ref:
-            ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha }}
 
 
       # ======================================================
       # Runner 环境
       # ======================================================
-
       - name: Verify SMB client
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
 
           echo "========================================"
           echo "Runner"
@@ -321,157 +216,508 @@ jobs:
 
           uname -a
 
-
           echo
           echo "========================================"
           echo "SMB client"
           echo "========================================"
 
-
           if ! command -v smbclient >/dev/null 2>&1
           then
-
             echo "ERROR: smbclient is not installed."
-
             echo
             echo "Install it on this self-hosted runner:"
-
             echo
             echo "sudo apt update"
             echo "sudo apt install -y smbclient"
-
             exit 1
-
           fi
-
 
           smbclient --version
 
 
       # ======================================================
-      # Windows
+      # 显示代理状态
+      #
+      # 不打印任何密码，仅确认 Runner service 是否拿到代理变量
       # ======================================================
+      - name: Show runner network configuration
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Download Windows x64 packages
+          echo "========================================"
+          echo "Runner proxy"
+          echo "========================================"
+
+          echo "HTTP_PROXY=${HTTP_PROXY:-not-set}"
+          echo "HTTPS_PROXY=${HTTPS_PROXY:-not-set}"
+          echo "NO_PROXY=${NO_PROXY:-not-set}"
+
+
+      # ======================================================
+      # Windows x64
+      # Attempt 1
+      # ======================================================
+      - name: Download Windows x64 packages - attempt 1
+        id: windows_download_1
+        continue-on-error: true
 
         uses: actions/download-artifact@v5
 
         with:
-
           name: log4app-windows-x64
-
           path: smb-packages/windows
-
-          github-token:
-            ${{ github.token }}
-
-          repository:
-            ${{ github.repository }}
-
-          run-id:
-            ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
 
 
       # ======================================================
-      # macOS
+      # Windows x64
+      # Retry 2
       # ======================================================
+      - name: Prepare Windows x64 retry 2
+        if: steps.windows_download_1.outcome == 'failure'
 
-      - name: Download macOS ARM64 packages
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          echo "Windows x64 artifact download failed."
+          echo "Cleaning incomplete download..."
+
+          rm -rf smb-packages/windows
+          mkdir -p smb-packages/windows
+
+          echo "Retrying in 10 seconds..."
+          sleep 10
+
+
+      - name: Download Windows x64 packages - attempt 2
+        id: windows_download_2
+
+        if: steps.windows_download_1.outcome == 'failure'
+
+        continue-on-error: true
 
         uses: actions/download-artifact@v5
 
         with:
+          name: log4app-windows-x64
+          path: smb-packages/windows
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
 
+
+      # ======================================================
+      # Windows x64
+      # Retry 3
+      # ======================================================
+      - name: Prepare Windows x64 retry 3
+        if: >-
+          steps.windows_download_1.outcome == 'failure' &&
+          steps.windows_download_2.outcome == 'failure'
+
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          echo "Windows x64 artifact download failed again."
+          echo "Cleaning incomplete download..."
+
+          rm -rf smb-packages/windows
+          mkdir -p smb-packages/windows
+
+          echo "Retrying in 30 seconds..."
+          sleep 30
+
+
+      - name: Download Windows x64 packages - attempt 3
+        id: windows_download_3
+
+        if: >-
+          steps.windows_download_1.outcome == 'failure' &&
+          steps.windows_download_2.outcome == 'failure'
+
+        uses: actions/download-artifact@v5
+
+        with:
+          name: log4app-windows-x64
+          path: smb-packages/windows
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+
+      # ======================================================
+      # macOS ARM64
+      # Attempt 1
+      # ======================================================
+      - name: Download macOS ARM64 packages - attempt 1
+        id: macos_download_1
+        continue-on-error: true
+
+        uses: actions/download-artifact@v5
+
+        with:
           name: log4app-macos-arm64
-
           path: smb-packages/macos-arm64
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
 
-          github-token:
-            ${{ github.token }}
 
-          repository:
-            ${{ github.repository }}
+      # ======================================================
+      # macOS ARM64
+      # Retry 2
+      # ======================================================
+      - name: Prepare macOS ARM64 retry 2
+        if: steps.macos_download_1.outcome == 'failure'
 
-          run-id:
-            ${{ github.event.workflow_run.id }}
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          echo "macOS ARM64 artifact download failed."
+          echo "Cleaning incomplete download..."
+
+          rm -rf smb-packages/macos-arm64
+          mkdir -p smb-packages/macos-arm64
+
+          echo "Retrying in 10 seconds..."
+          sleep 10
+
+
+      - name: Download macOS ARM64 packages - attempt 2
+        id: macos_download_2
+
+        if: steps.macos_download_1.outcome == 'failure'
+
+        continue-on-error: true
+
+        uses: actions/download-artifact@v5
+
+        with:
+          name: log4app-macos-arm64
+          path: smb-packages/macos-arm64
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+
+      # ======================================================
+      # macOS ARM64
+      # Retry 3
+      # ======================================================
+      - name: Prepare macOS ARM64 retry 3
+        if: >-
+          steps.macos_download_1.outcome == 'failure' &&
+          steps.macos_download_2.outcome == 'failure'
+
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          echo "macOS ARM64 artifact download failed again."
+          echo "Cleaning incomplete download..."
+
+          rm -rf smb-packages/macos-arm64
+          mkdir -p smb-packages/macos-arm64
+
+          echo "Retrying in 30 seconds..."
+          sleep 30
+
+
+      - name: Download macOS ARM64 packages - attempt 3
+        id: macos_download_3
+
+        if: >-
+          steps.macos_download_1.outcome == 'failure' &&
+          steps.macos_download_2.outcome == 'failure'
+
+        uses: actions/download-artifact@v5
+
+        with:
+          name: log4app-macos-arm64
+          path: smb-packages/macos-arm64
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
 
 
       # ======================================================
       # Linux x64
+      # Attempt 1
       # ======================================================
-
-      - name: Download Linux x64 packages
+      - name: Download Linux x64 packages - attempt 1
+        id: linux_x64_download_1
+        continue-on-error: true
 
         uses: actions/download-artifact@v5
 
         with:
-
           name: log4app-linux-x64
-
           path: smb-packages/linux-x64
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
 
-          github-token:
-            ${{ github.token }}
 
-          repository:
-            ${{ github.repository }}
+      # ======================================================
+      # Linux x64
+      # Retry 2
+      # ======================================================
+      - name: Prepare Linux x64 retry 2
+        if: steps.linux_x64_download_1.outcome == 'failure'
 
-          run-id:
-            ${{ github.event.workflow_run.id }}
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          echo "Linux x64 artifact download failed."
+          echo "Cleaning incomplete download..."
+
+          rm -rf smb-packages/linux-x64
+          mkdir -p smb-packages/linux-x64
+
+          echo "Retrying in 10 seconds..."
+          sleep 10
+
+
+      - name: Download Linux x64 packages - attempt 2
+        id: linux_x64_download_2
+
+        if: steps.linux_x64_download_1.outcome == 'failure'
+
+        continue-on-error: true
+
+        uses: actions/download-artifact@v5
+
+        with:
+          name: log4app-linux-x64
+          path: smb-packages/linux-x64
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+
+      # ======================================================
+      # Linux x64
+      # Retry 3
+      # ======================================================
+      - name: Prepare Linux x64 retry 3
+        if: >-
+          steps.linux_x64_download_1.outcome == 'failure' &&
+          steps.linux_x64_download_2.outcome == 'failure'
+
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          echo "Linux x64 artifact download failed again."
+          echo "Cleaning incomplete download..."
+
+          rm -rf smb-packages/linux-x64
+          mkdir -p smb-packages/linux-x64
+
+          echo "Retrying in 30 seconds..."
+          sleep 30
+
+
+      - name: Download Linux x64 packages - attempt 3
+        id: linux_x64_download_3
+
+        if: >-
+          steps.linux_x64_download_1.outcome == 'failure' &&
+          steps.linux_x64_download_2.outcome == 'failure'
+
+        uses: actions/download-artifact@v5
+
+        with:
+          name: log4app-linux-x64
+          path: smb-packages/linux-x64
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
 
 
       # ======================================================
       # Linux ARM64
+      # Attempt 1
       # ======================================================
-
-      - name: Download Linux ARM64 packages
+      - name: Download Linux ARM64 packages - attempt 1
+        id: linux_arm64_download_1
+        continue-on-error: true
 
         uses: actions/download-artifact@v5
 
         with:
-
           name: log4app-linux-arm64
-
           path: smb-packages/linux-arm64
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
 
-          github-token:
-            ${{ github.token }}
 
-          repository:
-            ${{ github.repository }}
+      # ======================================================
+      # Linux ARM64
+      # Retry 2
+      # ======================================================
+      - name: Prepare Linux ARM64 retry 2
+        if: steps.linux_arm64_download_1.outcome == 'failure'
 
-          run-id:
-            ${{ github.event.workflow_run.id }}
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          echo "Linux ARM64 artifact download failed."
+          echo "Cleaning incomplete download..."
+
+          rm -rf smb-packages/linux-arm64
+          mkdir -p smb-packages/linux-arm64
+
+          echo "Retrying in 10 seconds..."
+          sleep 10
+
+
+      - name: Download Linux ARM64 packages - attempt 2
+        id: linux_arm64_download_2
+
+        if: steps.linux_arm64_download_1.outcome == 'failure'
+
+        continue-on-error: true
+
+        uses: actions/download-artifact@v5
+
+        with:
+          name: log4app-linux-arm64
+          path: smb-packages/linux-arm64
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+
+      # ======================================================
+      # Linux ARM64
+      # Retry 3
+      # ======================================================
+      - name: Prepare Linux ARM64 retry 3
+        if: >-
+          steps.linux_arm64_download_1.outcome == 'failure' &&
+          steps.linux_arm64_download_2.outcome == 'failure'
+
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          echo "Linux ARM64 artifact download failed again."
+          echo "Cleaning incomplete download..."
+
+          rm -rf smb-packages/linux-arm64
+          mkdir -p smb-packages/linux-arm64
+
+          echo "Retrying in 30 seconds..."
+          sleep 30
+
+
+      - name: Download Linux ARM64 packages - attempt 3
+        id: linux_arm64_download_3
+
+        if: >-
+          steps.linux_arm64_download_1.outcome == 'failure' &&
+          steps.linux_arm64_download_2.outcome == 'failure'
+
+        uses: actions/download-artifact@v5
+
+        with:
+          name: log4app-linux-arm64
+          path: smb-packages/linux-arm64
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+
+      # ======================================================
+      # 四个平台全部下载完成后再次验证
+      # ======================================================
+      - name: Verify all downloaded packages
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          verify_directory() {
+            local dir="$1"
+            local platform="$2"
+
+            echo "Checking: $platform -> $dir"
+
+            if [ ! -d "$dir" ]; then
+              echo "ERROR: Directory does not exist: $dir"
+              exit 1
+            fi
+
+            if ! find "$dir" -type f -print -quit | grep -q .
+            then
+              echo "ERROR: No files found for $platform"
+              exit 1
+            fi
+
+            echo "OK: $platform"
+          }
+
+          echo
+          echo "========================================"
+          echo "Verify downloaded artifacts"
+          echo "========================================"
+
+          verify_directory \
+            "smb-packages/windows" \
+            "Windows x64"
+
+          verify_directory \
+            "smb-packages/macos-arm64" \
+            "macOS ARM64"
+
+          verify_directory \
+            "smb-packages/linux-x64" \
+            "Linux x64"
+
+          verify_directory \
+            "smb-packages/linux-arm64" \
+            "Linux ARM64"
 
 
       # ======================================================
       # 查看下载结果
       # ======================================================
-
       - name: Show downloaded packages
-
         shell: bash
 
         run: |
-
           set -euo pipefail
-
 
           echo "========================================"
           echo "Downloaded packages"
           echo "========================================"
 
-
           find smb-packages \
             -type f \
             -print
-
 
           echo
           echo "========================================"
           echo "Application version"
           echo "========================================"
-
 
           grep '^version:' pubspec.yaml
 
@@ -479,41 +725,23 @@ jobs:
       # ======================================================
       # 发布 SMB
       # ======================================================
-
       - name: Publish packages to SMB
-
         shell: bash
 
-
         env:
+          SMB_SERVER: ${{ secrets.SMB_SERVER }}
+          SMB_SHARE: ${{ secrets.SMB_SHARE }}
+          SMB_USER: ${{ secrets.SMB_USER }}
+          SMB_PASS: ${{ secrets.SMB_PASS }}
 
-          SMB_SERVER:
-            ${{ secrets.SMB_SERVER }}
-
-          SMB_SHARE:
-            ${{ secrets.SMB_SHARE }}
-
-          SMB_USER:
-            ${{ secrets.SMB_USER }}
-
-          SMB_PASS:
-            ${{ secrets.SMB_PASS }}
-
-          SMB_REMOTE_BASE:
-            Log4App
-
-          PACKAGE_ROOT:
-            smb-packages
-
+          SMB_REMOTE_BASE: Log4App
+          PACKAGE_ROOT: smb-packages
 
         run: |
-
           set -euo pipefail
-
 
           chmod +x \
             ./scripts/publish-smb.sh
-
 
           ./scripts/publish-smb.sh
 
@@ -521,105 +749,60 @@ jobs:
   # ==========================================================
   # 最终钉钉通知
   # ==========================================================
-
   notify-dingtalk:
-
     name: Notify DingTalk after SMB publish
-
 
     if: >-
       always() &&
       needs.collect-results.result != 'skipped'
 
-
     needs:
-
       - collect-results
-
       - publish-smb
-
 
     runs-on: ubuntu-latest
 
-
     steps:
 
-      # 使用同一个 Commit 的通知脚本
       - name: Check out notification script
-
         uses: actions/checkout@v6
 
         with:
-
-          ref:
-            ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha }}
 
 
       - name: Send final CI and publish result to DingTalk
 
         env:
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
 
-          DINGTALK_WEBHOOK:
-            ${{ secrets.DINGTALK_WEBHOOK }}
+          WINDOWS_RESULT: ${{ needs.collect-results.outputs.windows_result }}
+          MACOS_RESULT: ${{ needs.collect-results.outputs.macos_result }}
+          LINUX_X64_RESULT: ${{ needs.collect-results.outputs.linux_x64_result }}
+          LINUX_ARM64_RESULT: ${{ needs.collect-results.outputs.linux_arm64_result }}
 
-          DINGTALK_SECRET:
-            ${{ secrets.DINGTALK_SECRET }}
+          RELEASE_RESULT: ${{ needs.collect-results.outputs.release_result }}
 
+          SMB_RESULT: ${{ needs.publish-smb.result }}
 
-          WINDOWS_RESULT:
-            ${{ needs.collect-results.outputs.windows_result }}
+          IS_RELEASE: ${{ needs.collect-results.outputs.is_release }}
 
-          MACOS_RESULT:
-            ${{ needs.collect-results.outputs.macos_result }}
+          SMB_REQUIRED: "true"
+          FINAL_NOTIFICATION: "true"
 
-          LINUX_X64_RESULT:
-            ${{ needs.collect-results.outputs.linux_x64_result }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_NAME: push
 
-          LINUX_ARM64_RESULT:
-            ${{ needs.collect-results.outputs.linux_arm64_result }}
+          REF_NAME: ${{ needs.collect-results.outputs.ref_name }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
 
-          RELEASE_RESULT:
-            ${{ needs.collect-results.outputs.release_result }}
+          ACTOR: ${{ github.event.workflow_run.actor.login }}
 
-          SMB_RESULT:
-            ${{ needs.publish-smb.result }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
 
-
-          IS_RELEASE:
-            ${{ needs.collect-results.outputs.is_release }}
-
-          SMB_REQUIRED:
-            "true"
-
-          FINAL_NOTIFICATION:
-            "true"
-
-
-          REPOSITORY:
-            ${{ github.repository }}
-
-          EVENT_NAME:
-            push
-
-          REF_NAME:
-            ${{ needs.collect-results.outputs.ref_name }}
-
-          COMMIT_SHA:
-            ${{ github.event.workflow_run.head_sha }}
-
-          ACTOR:
-            ${{ github.event.workflow_run.actor.login }}
-
-
-          RUN_URL:
-            ${{ github.event.workflow_run.html_url }}
-
-
-          RELEASE_URL:
-            ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.collect-results.outputs.ref_name }}
-
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.collect-results.outputs.ref_name }}
 
         run: |
-
           python3 \
             .github/scripts/notify_dingtalk.py
